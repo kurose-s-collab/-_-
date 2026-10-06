@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>社会科「学びの可視化」アプリ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap');
+    html { background: #f8fafc; }
+    body { margin: 0; font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    input[type="range"] { accent-color: #4f46e5; }
+    .pdf-surface { font-family: 'Noto Sans JP', sans-serif; }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #fff !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useEffect, useMemo, useRef, useState } = React;
+    const {
+      ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid,
+      Tooltip, Legend, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+    } = Recharts;
+
+    const IconSave = () => (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h8l4 4v12a2 2 0 01-2 2H7a2 2 0 01-2-2V5zm4-2v6h6V3M8 21v-7h8v7" />
+      </svg>
+    );
+    const IconFolder = () => (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+      </svg>
+    );
+    const IconPdf = () => (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v6h6M9 14h6M9 18h4" />
+      </svg>
+    );
+    const IconPlus = () => (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v14M5 12h14" />
+      </svg>
+    );
+    const IconTrash = () => (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5M14 11v5" />
+      </svg>
+    );
+    const IconChart = () => (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19V9m5 10V5m5 14v-7m5 7V3" />
+      </svg>
+    );
+    const IconBookOpen = () => (
+      <svg className="w-6 h-6 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+      </svg>
+    );
+
+    const SOCIAL_PRESETS = [
+      {
+        id: 'unit-geo-1',
+        unit: '持続可能な地域社会の形成（地理）',
+        question: '地域の人口変化や自然環境を踏まえ、持続可能なまちづくりを行うにはどのような視点が必要だろうか？',
+        targetGoal: '多角的な視点（防災・産業・人口）から地域の課題を分析し、根拠をもった持続可能なまちづくりの提案ができるようになる。',
+        viewpoints: ['自然環境と防災', '産業・雇用と交通網', '人口動態・高齢化', '地域の歴史的背景', '他地域・持続可能対策']
+      },
+      {
+        id: 'unit-hist-1',
+        unit: '近代日本の歩みと国際社会（歴史）',
+        question: '明治維新以降の日本の近代化は、人々の生活や国際関係にどのような影響を与えただろうか？',
+        targetGoal: '近代化の光と影の両面を捉え、歴史的資料に基づいて自分の考えをまとめ論理的に記述できるようになる。',
+        viewpoints: ['政治・憲法制度の変遷', '産業革命と経済の発展', '外交関係と条約改正', '人々の暮らしと文化の変化', '周辺国との関わり']
+      },
+      {
+        id: 'unit-civ-1',
+        unit: '現代の民主政治と日本国憲法（公民）',
+        question: '個人の尊厳を守り、多様な人々が共に生きる社会をつくるために、私たちはどのように政治に関わるべきか？',
+        targetGoal: '対立と合意の観点を理解し、主権者として社会課題に対する多様な意見を尊重しながら参画する意欲を高める。',
+        viewpoints: ['基本的人権の尊重', '国会・内閣・裁判所の働き', '地方自治と住民参加', 'メディアと情報活用', '現代社会の課題解決']
+      }
+    ];
+
+    const createInitialUnitData = () => ({
+      studentInfo: { className: '2年1組', number: '15', name: '山田 太郎' },
+      currentUnitId: 'unit-geo-1',
+      units: [{
+        id: 'unit-geo-1',
+        unitTitle: '持続可能な地域社会の形成（地理）',
+        centralQuestion: '地域の人口変化や自然環境を踏まえ、持続可能なまちづくりを行うにはどのような視点が必要だろうか？',
+        targetGoal: '多角的な視点（防災・産業・人口）から地域の課題を捉え、根拠のある持続可能な解決策を表現できるようになる。',
+        isManualOverall: false,
+        manualOverallScore: 60,
+        viewpoints: [
+          { id: 'vp-1', name: '自然環境・災害への備え', score: 65, note: '' },
+          { id: 'vp-2', name: '産業・交通網の現状', score: 80, note: '' },
+          { id: 'vp-3', name: '人口変化と高齢化', score: 45, note: '' },
+          { id: 'vp-4', name: '地域の歴史的背景', score: 70, note: '' }
+        ],
+        snapshots: []
+      }]
+    });
+
+    const safeFileName = (text) => String(text || '生徒').replace(/[\\/:*?"<>|]/g, '_').trim() || '生徒';
+    const dateForFile = () => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    // File System Access API は cross-origin iframe 内では使えない。
+    // 単独タブで開いている場合だけネイティブのファイルピッカーを使う。
+    const isEmbeddedView = () => {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return true;
+      }
+    };
+
+    const canUseNativeFilePicker = () => {
+      try {
+        return !isEmbeddedView() &&
+          window.isSecureContext &&
+          typeof window.showOpenFilePicker === 'function' &&
+          typeof window.showSaveFilePicker === 'function';
+      } catch (e) {
+        return false;
+      }
+    };
+
+
+    // 選択したJSONファイルのハンドルをIndexedDBに保存する。
+    // File System Access APIのFileSystemFileHandleはStructured Clone対応のため、
+    // 対応ブラウザでは次回起動時にも同じ上書き先を復元できる。
+    const FILE_HANDLE_DB = 'social_studies_vis_file_handle_db';
+    const FILE_HANDLE_STORE = 'handles';
+    const FILE_HANDLE_KEY = 'primary-data-file';
+
+    const openFileHandleDb = () => new Promise((resolve, reject) => {
+      if (!('indexedDB' in window)) {
+        resolve(null);
+        return;
+      }
+      const request = indexedDB.open(FILE_HANDLE_DB, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(FILE_HANDLE_STORE)) {
+          db.createObjectStore(FILE_HANDLE_STORE);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    const rememberFileHandle = async (handle) => {
+      if (!handle) return;
+      try {
+        const db = await openFileHandleDb();
+        if (!db) return;
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(FILE_HANDLE_STORE, 'readwrite');
+          tx.objectStore(FILE_HANDLE_STORE).put(handle, FILE_HANDLE_KEY);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error);
+        });
+        db.close();
+      } catch (e) {
+        console.warn('上書き先の記憶に失敗しました。', e);
+      }
+    };
+
+    const restoreRememberedFileHandle = async () => {
+      try {
+        const db = await openFileHandleDb();
+        if (!db) return null;
+        const handle = await new Promise((resolve, reject) => {
+          const tx = db.transaction(FILE_HANDLE_STORE, 'readonly');
+          const req = tx.objectStore(FILE_HANDLE_STORE).get(FILE_HANDLE_KEY);
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => reject(req.error);
+        });
+        db.close();
+        return handle;
+      } catch (e) {
+        console.warn('記憶した上書き先を復元できませんでした。', e);
+        return null;
+      }
+    };
+
+    const forgetRememberedFileHandle = async () => {
+      try {
+        const db = await openFileHandleDb();
+        if (!db) return;
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(FILE_HANDLE_STORE, 'readwrite');
+          tx.objectStore(FILE_HANDLE_STORE).delete(FILE_HANDLE_KEY);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error);
+        });
+        db.close();
+      } catch (e) {
+        console.warn('上書き先の記憶を削除できませんでした。', e);
+      }
+    };
+
+    function App() {
+      const STORAGE_KEY = 'social_studies_vis_data_v11';
+      const fileInputRef = useRef(null);
+      const pdfRef = useRef(null);
+
+      const [data, setData] = useState(() => {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('social_studies_vis_data_v10') || localStorage.getItem('social_studies_vis_data_v9') || localStorage.getItem('social_studies_vis_data_v8') || localStorage.getItem('social_studies_vis_data_v7') || localStorage.getItem('social_studies_vis_data_v6');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed?.units?.length && parsed?.studentInfo) return parsed;
+          }
+        } catch (e) {
+          console.warn('保存データを読み込めませんでした。', e);
+        }
+        return createInitialUnitData();
+      });
+
+      const [activeTab, setActiveTab] = useState('input');
+      const [fileHandle, setFileHandle] = useState(null);
+      const [fileName, setFileName] = useState('');
+      const [filePermissionState, setFilePermissionState] = useState('none');
+      const [status, setStatus] = useState('');
+      const [errorMessage, setErrorMessage] = useState('');
+      const [todayComment, setTodayComment] = useState('');
+      const [newViewpointName, setNewViewpointName] = useState('');
+      const [isExportingPdf, setIsExportingPdf] = useState(false);
+      const [pendingPdfDownload, setPendingPdfDownload] = useState(null);
+      const [selectedViewpointId, setSelectedViewpointId] = useState(null);
+      const [showAddUnitModal, setShowAddUnitModal] = useState(false);
+      const [newUnitDraft, setNewUnitDraft] = useState({
+        unitTitle: '',
+        centralQuestion: '',
+        targetGoal: '',
+        firstViewpoint: '学習内容の理解'
+      });
+
+      useEffect(() => {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+        catch (e) { console.warn('自動保存に失敗しました。', e); }
+      }, [data]);
+
+      // 前回指定した上書き先を、次回の授業でも復元する。
+      // 権限が「prompt」の場合は、実際に上書き保存ボタンを押した時に再確認される。
+      useEffect(() => {
+        let cancelled = false;
+        const restoreHandle = async () => {
+          if (!canUseNativeFilePicker()) return;
+          const handle = await restoreRememberedFileHandle();
+          if (!handle || cancelled) return;
+          try {
+            let permission = 'prompt';
+            if (typeof handle.queryPermission === 'function') {
+              permission = await handle.queryPermission({ mode: 'readwrite' });
+            }
+            if (cancelled) return;
+            setFileHandle(handle);
+            setFileName(handle.name || '');
+            setFilePermissionState(permission || 'prompt');
+          } catch (e) {
+            console.warn('上書き先の権限状態を確認できませんでした。', e);
+            if (!cancelled) {
+              setFileHandle(handle);
+              setFileName(handle.name || '');
+              setFilePermissionState('prompt');
+            }
+          }
+        };
+        restoreHandle();
+        return () => { cancelled = true; };
+      }, []);
+
+      const currentUnit = useMemo(() => {
+        return data.units.find(u => u.id === data.currentUnitId) || data.units[0];
+      }, [data.units, data.currentUnitId]);
+
+      const updateCurrentUnit = (updater) => {
+        setData(prev => ({
+          ...prev,
+          units: prev.units.map(u => u.id === prev.currentUnitId ? updater(u) : u)
+        }));
+      };
+
+      const calculatedAvgOverall = useMemo(() => {
+        if (!currentUnit?.viewpoints?.length) return 0;
+        const total = currentUnit.viewpoints.reduce((sum, vp) => sum + (Number(vp.score) || 0), 0);
+        return Math.round(total / currentUnit.viewpoints.length);
+      }, [currentUnit?.viewpoints]);
+
+      const effectiveOverall = currentUnit?.isManualOverall
+        ? Number(currentUnit.manualOverallScore ?? calculatedAvgOverall)
+        : calculatedAvgOverall;
+
+      const chartData = useMemo(() => {
+        return (currentUnit?.snapshots || []).map((snap, index) => {
+          const lessonNumber = Number(snap.lessonNumber) || (index + 1);
+          const point = {
+            lesson: `第${lessonNumber}回`,
+            date: snap.displayDate || snap.date,
+            '全体達成度': snap.overall
+          };
+          (currentUnit.viewpoints || []).forEach(vp => {
+            if (snap.scores && snap.scores[vp.id] !== undefined) {
+              point[vp.id] = snap.scores[vp.id];
+              point[vp.name] = snap.scores[vp.id];
+            }
+          });
+          return point;
+        });
+      }, [currentUnit]);
+
+      const currentLessonNumber = useMemo(() => {
+        const snapshots = currentUnit?.snapshots || [];
+        if (!snapshots.length) return 1;
+        const maxLesson = snapshots.reduce((max, snap, index) => {
+          const lesson = Number(snap.lessonNumber) || (index + 1);
+          return Math.max(max, lesson);
+        }, 0);
+        return maxLesson + 1;
+      }, [currentUnit?.snapshots]);
+
+      useEffect(() => {
+        const ids = (currentUnit?.viewpoints || []).map(vp => vp.id);
+        if (!ids.length) {
+          setSelectedViewpointId(null);
+        } else if (!selectedViewpointId || !ids.includes(selectedViewpointId)) {
+          setSelectedViewpointId(ids[0]);
+        }
+      }, [currentUnit?.id, currentUnit?.viewpoints, selectedViewpointId]);
+
+      const selectedViewpoint = useMemo(() => {
+        return (currentUnit?.viewpoints || []).find(vp => vp.id === selectedViewpointId) || currentUnit?.viewpoints?.[0] || null;
+      }, [currentUnit?.viewpoints, selectedViewpointId]);
+
+      const selectedViewpointHistory = useMemo(() => {
+        if (!selectedViewpoint) return [];
+        return (currentUnit?.snapshots || [])
+          .map((snap, index) => ({ snap, index }))
+          .filter(({ snap }) => snap.scores && snap.scores[selectedViewpoint.id] !== undefined)
+          .map(({ snap, index }) => ({
+            lesson: `第${Number(snap.lessonNumber) || (index + 1)}回`,
+            date: snap.displayDate || snap.date,
+            score: snap.scores[selectedViewpoint.id]
+          }));
+      }, [currentUnit?.snapshots, selectedViewpoint]);
+
+      const radarData = useMemo(() => (currentUnit?.viewpoints || []).map(vp => ({
+        subject: vp.name.length > 10 ? `${vp.name.slice(0, 10)}…` : vp.name,
+        value: Number(vp.score) || 0,
+        fullMark: 100
+      })), [currentUnit?.viewpoints]);
+
+      const flashStatus = (message) => {
+        setStatus(message);
+        window.setTimeout(() => setStatus(''), 4000);
+      };
+
+      const normalizeImportedData = (parsed) => {
+        if (!parsed || !Array.isArray(parsed.units) || !parsed.units.length) {
+          throw new Error('このファイルは学習データの形式ではありません。');
+        }
+
+        const normalizedUnits = parsed.units.map((unit, unitIndex) => {
+          const unitId = unit.id || `unit-import-${Date.now()}-${unitIndex}`;
+          const viewpoints = Array.isArray(unit.viewpoints) && unit.viewpoints.length
+            ? unit.viewpoints.map((vp, vpIndex) => ({
+                id: vp.id || `vp-import-${unitIndex}-${vpIndex}`,
+                name: vp.name || `項目${vpIndex + 1}`,
+                score: Math.max(0, Math.min(100, Number(vp.score) || 0)),
+                note: vp.note || ''
+              }))
+            : [{ id: `vp-import-${unitIndex}-0`, name: '学習内容の理解', score: 50, note: '' }];
+
+          return {
+            id: unitId,
+            unitTitle: unit.unitTitle || unit.title || `単元${unitIndex + 1}`,
+            centralQuestion: unit.centralQuestion || unit.question || '',
+            targetGoal: unit.targetGoal || '',
+            isManualOverall: !!unit.isManualOverall,
+            manualOverallScore: Math.max(0, Math.min(100, Number(unit.manualOverallScore) || 0)),
+            viewpoints,
+            snapshots: Array.isArray(unit.snapshots)
+              ? unit.snapshots.map((snap, snapIndex) => ({
+                  ...snap,
+                  lessonNumber: Number(snap.lessonNumber) || (snapIndex + 1)
+                }))
+              : []
+          };
+        });
+
+        const requestedCurrentId = parsed.currentUnitId;
+        const currentUnitId = normalizedUnits.some(u => u.id === requestedCurrentId)
+          ? requestedCurrentId
+          : normalizedUnits[0].id;
+
+        return {
+          ...parsed,
+          studentInfo: {
+            className: parsed.studentInfo?.className || '',
+            number: parsed.studentInfo?.number || '',
+            name: parsed.studentInfo?.name || ''
+          },
+          currentUnitId,
+          units: normalizedUnits
+        };
+      };
+
+      const loadFile = async (file, handle = null) => {
+        const raw = await file.text();
+        const parsed = normalizeImportedData(JSON.parse(raw));
+        setData(parsed);
+        setFileHandle(handle);
+        setFileName(file.name || '');
+        setErrorMessage('');
+
+        if (handle) {
+          await rememberFileHandle(handle);
+          try {
+            const permission = typeof handle.queryPermission === 'function'
+              ? await handle.queryPermission({ mode: 'readwrite' })
+              : 'granted';
+            setFilePermissionState(permission || 'prompt');
+          } catch {
+            setFilePermissionState('prompt');
+          }
+        } else {
+          setFilePermissionState('none');
+          // 通常の<input type=file>で別ファイルを読み込んだ場合、
+          // 以前のファイルを誤って上書きしないよう、記憶した保存先は解除する。
+          if (!isEmbeddedView()) await forgetRememberedFileHandle();
+        }
+
+        flashStatus(handle
+          ? `「${file.name}」を読み込みました。このファイルを上書き先として記憶しました。`
+          : canUseNativeFilePicker()
+            ? `「${file.name}」を読み込みました。次に「上書き保存」で保存先を指定すると、そのファイルを以後の上書き先として記憶します。`
+            : `「${file.name}」を読み込みました。現在は埋め込み表示のため直接上書きはできません。HTMLをChrome / Edgeで単独で開くと上書き保存できます。`);
+      };
+
+      const openWithNormalFilePicker = () => {
+        fileInputRef.current?.click();
+      };
+
+      const handleOpenData = async () => {
+        setErrorMessage('');
+
+        // ChatGPTのプレビューなど cross-origin iframe 内では
+        // showOpenFilePicker() 自体がブラウザに禁止されるため、最初から通常選択へ切り替える。
+        if (!canUseNativeFilePicker()) {
+          openWithNormalFilePicker();
+          if (isEmbeddedView()) {
+            flashStatus('埋め込み表示のため通常のファイル選択を使用します。直接上書き保存を使う場合は、このHTMLをChrome / Edgeで単独で開いてください。');
+          }
+          return;
+        }
+
+        try {
+          const [handle] = await window.showOpenFilePicker({
+            multiple: false,
+            types: [{
+              description: '社会科 学習データ',
+              accept: { 'application/json': ['.json'] }
+            }]
+          });
+          const file = await handle.getFile();
+          await loadFile(file, handle);
+        } catch (e) {
+          if (e?.name === 'AbortError') return;
+          console.warn('ネイティブのファイル選択を使えなかったため通常選択へ切り替えます。', e);
+          // 権限・実行環境の都合で失敗した場合も、エラーで止めず通常選択へ退避する。
+          openWithNormalFilePicker();
+          flashStatus('通常のファイル選択へ切り替えました。');
+        }
+      };
+
+      const handleFallbackImport = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        try {
+          await loadFile(file, null);
+        } catch (e) {
+          console.error(e);
+          setErrorMessage(`ファイルを読み込めませんでした：${e.message || '形式を確認してください'}`);
+        }
+      };
+
+      const downloadJsonFallback = (jsonText, preferredName = '') => {
+        const blob = new Blob([jsonText], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = preferredName || fileName || `社会科学びの記録_${safeFileName(data.studentInfo.name)}_${dateForFile()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 500);
+        flashStatus(`「${a.download}」として保存しました。`);
+      };
+
+      const ensureWritePermission = async (handle) => {
+        try {
+          if (!handle?.queryPermission || !handle?.requestPermission) return true;
+          const options = { mode: 'readwrite' };
+          if (await handle.queryPermission(options) === 'granted') return true;
+          return (await handle.requestPermission(options)) === 'granted';
+        } catch {
+          return true;
+        }
+      };
+
+      const saveWithHandle = async (handle, jsonText) => {
+        const allowed = await ensureWritePermission(handle);
+        if (!allowed) return null;
+        const writable = await handle.createWritable();
+        await writable.write(jsonText);
+        await writable.close();
+        setFileHandle(handle);
+        setFileName(handle.name || fileName);
+        setFilePermissionState('granted');
+        await rememberFileHandle(handle);
+        return handle;
+      };
+
+      const handleSaveToFile = async (forceNew = false) => {
+        const jsonText = JSON.stringify(data, null, 2);
+        setErrorMessage('');
+
+        try {
+          // 1. 記憶済みの上書き先がある場合は、保存ダイアログを出さず同じファイルへ保存する。
+          if (fileHandle && !forceNew) {
+            const savedHandle = await saveWithHandle(fileHandle, jsonText);
+            if (savedHandle) {
+              flashStatus(`「${savedHandle.name || '学習データ'}」へ上書き保存しました。次回の授業でも同じファイルを使います。`);
+              return;
+            }
+
+            // 権限が明示的に拒否された場合だけ、保存先を選び直せるようにする。
+            setFileHandle(null);
+            setFilePermissionState('none');
+            await forgetRememberedFileHandle();
+          }
+
+          // 2. 最初の1回（または「別名保存」）だけ保存先を選ぶ。
+          //    選んだハンドルはIndexedDBに保存し、次回起動時に復元する。
+          if (canUseNativeFilePicker()) {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: fileName || `社会科学びの記録_${safeFileName(data.studentInfo.name)}.json`,
+              types: [{
+                description: '社会科 学習データ',
+                accept: { 'application/json': ['.json'] }
+              }]
+            });
+
+            const savedHandle = await saveWithHandle(handle, jsonText);
+            if (!savedHandle) throw new Error('ファイルへの書き込みが許可されませんでした。');
+            flashStatus(`「${savedHandle.name || '学習データ'}」へ${forceNew ? '別名保存' : '保存'}しました。このファイルを今後の上書き先として記憶しました。`);
+            return;
+          }
+
+          // 3. 埋め込み表示ではOS上の既存ファイルを直接書き換えることはブラウザ仕様上できない。
+          downloadJsonFallback(jsonText, fileName || '');
+          flashStatus('この埋め込み画面では直接上書きできないため、JSONをダウンロードしました。1ファイル運用には、HTMLをChrome / Edgeで単独で開いてください。');
+        } catch (e) {
+          if (e?.name === 'AbortError') return;
+          console.error(e);
+          setErrorMessage(`保存できませんでした：${e.message || '不明なエラー'}`);
+        }
+      };
+
+      const handleExportPDF = async () => {
+        setErrorMessage('');
+        setIsExportingPdf(true);
+        try {
+          if (!window.html2canvas || !window.jspdf?.jsPDF) {
+            throw new Error('PDF出力ライブラリを読み込めませんでした。インターネット接続を確認してください。');
+          }
+          if (document.fonts?.ready) await document.fonts.ready;
+          await new Promise(resolve => setTimeout(resolve, 120));
+
+          const report = pdfRef.current;
+          if (!report) throw new Error('PDF用レポートを作成できませんでした。');
+
+          const canvas = await window.html2canvas(report, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            windowWidth: 900
+          });
+
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+          const margin = 10;
+          const pageWidth = 210;
+          const pageHeight = 297;
+          const contentWidth = pageWidth - margin * 2;
+          const contentHeight = pageHeight - margin * 2;
+          const imageHeight = canvas.height * contentWidth / canvas.width;
+          const imageData = canvas.toDataURL('image/jpeg', 0.93);
+
+          let offsetY = 0;
+          let remaining = imageHeight;
+          pdf.addImage(imageData, 'JPEG', margin, margin + offsetY, contentWidth, imageHeight, undefined, 'FAST');
+          remaining -= contentHeight;
+
+          while (remaining > 0) {
+            pdf.addPage();
+            offsetY -= contentHeight;
+            pdf.addImage(imageData, 'JPEG', margin, margin + offsetY, contentWidth, imageHeight, undefined, 'FAST');
+            remaining -= contentHeight;
+          }
+
+          const pdfName = `社会科学びの可視化_${safeFileName(data.studentInfo.name)}_${dateForFile()}.pdf`;
+          const pdfBlob = pdf.output('blob');
+
+          // 単独表示かつ File System Access API が使える場合は、
+          // 実際にファイルへの書き込みが完了してから「保存しました」と表示する。
+          if (!isEmbeddedView() && window.isSecureContext && typeof window.showSaveFilePicker === 'function') {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: pdfName,
+              types: [{
+                description: 'PDFファイル',
+                accept: { 'application/pdf': ['.pdf'] }
+              }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(pdfBlob);
+            await writable.close();
+            setPendingPdfDownload(prev => {
+              if (prev?.url) URL.revokeObjectURL(prev.url);
+              return null;
+            });
+            flashStatus(`PDFを「${handle.name || pdfName}」として保存しました。`);
+            return;
+          }
+
+          // 埋め込み表示では自動ダウンロードがブラウザに止められることがある。
+          // PDF自体はBlobとして生成し、ユーザーが明示的に押せる保存リンクを表示する。
+          if (isEmbeddedView()) {
+            const url = URL.createObjectURL(pdfBlob);
+            setPendingPdfDownload(prev => {
+              if (prev?.url) URL.revokeObjectURL(prev.url);
+              return { url, name: pdfName };
+            });
+            flashStatus('PDFを作成しました。下に表示された「PDFを保存する」を押してください。');
+            return;
+          }
+
+          // File System Access API 非対応の通常ブラウザでは標準ダウンロードを使う。
+          const url = URL.createObjectURL(pdfBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = pdfName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 3000);
+          flashStatus('PDFのダウンロードを開始しました。ブラウザのダウンロード一覧を確認してください。');
+        } catch (e) {
+          if (e?.name === 'AbortError') {
+            flashStatus('PDFの保存をキャンセルしました。');
+            return;
+          }
+          console.error(e);
+          setErrorMessage(`PDFを出力できませんでした：${e.message || '不明なエラー'}`);
+        } finally {
+          setIsExportingPdf(false);
+        }
+      };
+
+      const handleScoreChange = (id, value) => {
+        const score = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+        updateCurrentUnit(u => ({
+          ...u,
+          viewpoints: u.viewpoints.map(vp => vp.id === id ? { ...vp, score } : vp)
+        }));
+      };
+
+      const handleSaveSnapshot = () => {
+        if (!todayComment.trim()) {
+          setErrorMessage('本日の振り返りを入力してから記録してください。');
+          return;
+        }
+        setErrorMessage('');
+        const now = new Date();
+        const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const displayDate = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        const scores = {};
+        currentUnit.viewpoints.forEach(vp => { scores[vp.id] = Number(vp.score) || 0; });
+        const snapshot = {
+          id: `snap-${Date.now()}`,
+          lessonNumber: currentLessonNumber,
+          date,
+          displayDate,
+          scores,
+          overall: effectiveOverall,
+          comment: todayComment.trim()
+        };
+        updateCurrentUnit(u => ({ ...u, snapshots: [...(u.snapshots || []), snapshot] }));
+        setTodayComment('');
+        flashStatus('本日の振り返りを記録しました。');
+      };
+
+      const handleApplyPreset = (preset) => {
+        const existing = data.units.find(u => u.unitTitle === preset.unit);
+        if (existing) {
+          setData(prev => ({ ...prev, currentUnitId: existing.id }));
+          return;
+        }
+        const stamp = Date.now();
+        const newUnit = {
+          id: `unit-${stamp}`,
+          unitTitle: preset.unit,
+          centralQuestion: preset.question,
+          targetGoal: preset.targetGoal,
+          isManualOverall: false,
+          manualOverallScore: 40,
+          viewpoints: preset.viewpoints.map((name, i) => ({ id: `vp-${stamp}-${i}`, name, score: 40, note: '' })),
+          snapshots: []
+        };
+        setData(prev => ({ ...prev, units: [...prev.units, newUnit], currentUnitId: newUnit.id }));
+      };
+
+      const addViewpoint = () => {
+        const name = newViewpointName.trim();
+        if (!name) return;
+        updateCurrentUnit(u => ({
+          ...u,
+          viewpoints: [...u.viewpoints, { id: `vp-${Date.now()}`, name, score: 50, note: '' }]
+        }));
+        setNewViewpointName('');
+      };
+
+      const openAddUnitModal = () => {
+        setNewUnitDraft({
+          unitTitle: '',
+          centralQuestion: '',
+          targetGoal: '',
+          firstViewpoint: '学習内容の理解'
+        });
+        setShowAddUnitModal(true);
+      };
+
+      const handleCreateUnit = () => {
+        const title = newUnitDraft.unitTitle.trim();
+        if (!title) {
+          setErrorMessage('単元名を入力してください。');
+          return;
+        }
+        const stamp = Date.now();
+        const firstViewpoint = newUnitDraft.firstViewpoint.trim() || '学習内容の理解';
+        const newUnit = {
+          id: `unit-${stamp}`,
+          unitTitle: title,
+          centralQuestion: newUnitDraft.centralQuestion.trim(),
+          targetGoal: newUnitDraft.targetGoal.trim(),
+          isManualOverall: false,
+          manualOverallScore: 50,
+          viewpoints: [{
+            id: `vp-${stamp}-0`,
+            name: firstViewpoint,
+            score: 50,
+            note: ''
+          }],
+          snapshots: []
+        };
+        setData(prev => ({
+          ...prev,
+          units: [...prev.units, newUnit],
+          currentUnitId: newUnit.id
+        }));
+        setShowAddUnitModal(false);
+        setErrorMessage('');
+        setActiveTab('input');
+        flashStatus(`新しい単元「${title}」を追加しました。`);
+      };
+
+      const viewpointColors = ['#4f46e5', '#059669', '#d97706', '#db2777', '#0891b2', '#7c3aed', '#ea580c'];
+      const lastSnapshot = currentUnit.snapshots?.[currentUnit.snapshots.length - 1];
+      const diff = lastSnapshot ? effectiveOverall - Number(lastSnapshot.overall || 0) : null;
+
+      return (
+        <div className="min-h-screen pb-16">
+          <input ref={fileInputRef} type="file" accept="application/json,.json" className="hidden" onChange={handleFallbackImport} />
+
+          <header className="bg-indigo-700 text-white shadow-md sticky top-0 z-40 no-print">
+            <div className="max-w-5xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
+              <div className="flex items-center space-x-3">
+                <div className="bg-indigo-600 p-2 rounded-lg border border-indigo-500">
+                  <IconBookOpen />
+                </div>
+                <div>
+                  <h1 className="font-bold text-lg leading-tight flex items-center gap-2">
+                    社会科「学びの可視化」アプリ
+                    <span className="hidden sm:inline text-xs bg-indigo-500 px-2 py-0.5 rounded-full font-normal">中学校・高校用</span>
+                  </h1>
+                  <p className="text-xs text-indigo-200">探究の問いに対する理解度の変化と軌跡を可視化しよう</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={handleOpenData} className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow transition-all">
+                  <IconFolder /> 開く
+                </button>
+                <button title="現在のファイルに上書き保存。まだ保存先がない場合は最初に保存先を選びます" onClick={() => handleSaveToFile(false)} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow transition-all">
+                  <IconSave /> 上書き保存
+                </button>
+                <button onClick={() => handleSaveToFile(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow transition-all">
+                  別名保存
+                </button>
+                <button disabled={isExportingPdf} onClick={handleExportPDF} className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow transition-all">
+                  <IconPdf /> {isExportingPdf ? 'PDF作成中…' : 'PDF出力'}
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-5xl mx-auto px-4 py-5 space-y-4">
+            {status && <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm font-semibold">{status}</div>}
+            {errorMessage && <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl px-4 py-3 text-sm">{errorMessage}</div>}
+            {pendingPdfDownload && (
+              <div className="no-print bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-amber-900">PDFの作成が完了しました</div>
+                  <div className="text-xs text-amber-800 mt-1">埋め込み画面では自動保存できないため、下のボタンを押して保存してください。</div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <a
+                    href={pendingPdfDownload.url}
+                    download={pendingPdfDownload.name}
+                    className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-bold text-xs shadow"
+                  >
+                    <IconPdf /> PDFを保存する
+                  </a>
+                  <a
+                    href={pendingPdfDownload.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 px-4 py-2 rounded-lg font-bold text-xs"
+                  >
+                    PDFを開く
+                  </a>
+                </div>
+              </div>
+            )}
+            {isEmbeddedView() && (
+              <div className="no-print bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-2.5 text-xs">
+                このプレビュー画面ではブラウザの制限により元ファイルへ直接上書きできません。PDFは作成後に「PDFを保存する」ボタンが表示されます。1つのJSONファイルを授業ごとに上書きして使う場合は、このHTMLをダウンロードしてChrome / Edgeで単独で開いてください。
+              </div>
+            )}
+            {(fileName || fileHandle) && (
+              <div className="no-print text-[11px] text-slate-500 flex flex-wrap gap-2 px-1 items-center">
+                <span>上書き先：{fileName || '未選択'}</span>
+                {fileHandle ? (
+                  <span className="text-emerald-600 font-bold">
+                    ✓ 同じファイルを継続利用
+                    {filePermissionState === 'prompt' ? '（次回保存時に権限確認が出る場合があります）' : ''}
+                  </span>
+                ) : (
+                  <span className="text-amber-600 font-bold">△ {canUseNativeFilePicker() ? '最初の「上書き保存」で保存先を1回だけ指定してください' : '単独表示では同じファイルへの上書き保存を利用できます'}</span>
+                )}
+              </div>
+            )}
+
+            <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div className="grid md:grid-cols-[1fr_auto] gap-4 items-start">
+                <div>
+                  <p className="text-[11px] font-bold text-indigo-600 mb-1">現在の探究単元</p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <select
+                      value={data.currentUnitId}
+                      onChange={e => setData(prev => ({ ...prev, currentUnitId: e.target.value }))}
+                      className="flex-1 md:max-w-xl border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold bg-white"
+                    >
+                      {data.units.map(unit => <option key={unit.id} value={unit.id}>{unit.unitTitle}</option>)}
+                    </select>
+                    <button
+                      onClick={openAddUnitModal}
+                      className="no-print flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg font-bold text-xs shadow-sm whitespace-nowrap"
+                    >
+                      <IconPlus /> 単元を追加
+                    </button>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 border border-amber-200 px-3 py-1 text-xs font-black mb-2">
+                    現在 第{currentLessonNumber}回の授業
+                  </div>
+                  <div className="text-4xl font-black text-indigo-700 leading-none">{effectiveOverall}<span className="text-lg">%</span></div>
+                  <div className="text-[11px] text-slate-500 mt-1">現在の全体達成度</div>
+                  {diff !== null && <div className={`text-xs font-bold mt-1 ${diff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>前回比 {diff >= 0 ? '+' : ''}{diff}%</div>}
+                </div>
+              </div>
+            </section>
+
+            <nav className="bg-white rounded-xl border border-slate-200 p-1.5 flex gap-1 no-print">
+              {[
+                ['input', '入力・振り返り'],
+                ['visual', '学びの可視化'],
+                ['history', '記録履歴']
+              ].map(([key, label]) => (
+                <button key={key} onClick={() => setActiveTab(key)} className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold transition ${activeTab === key ? 'bg-indigo-600 text-white shadow' : 'text-slate-600 hover:bg-slate-100'}`}>{label}</button>
+              ))}
+            </nav>
+
+            {activeTab === 'input' && (
+              <div className="grid lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 space-y-4">
+                  <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h2 className="font-extrabold text-base">学習者情報・単元設定</h2>
+                      <span className="text-[10px] text-slate-400">入力内容は自動保存されます</span>
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <label className="text-xs font-bold text-slate-600">学年・学級
+                        <input value={data.studentInfo.className} onChange={e => setData(prev => ({...prev, studentInfo:{...prev.studentInfo, className:e.target.value}}))} className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 font-normal" />
+                      </label>
+                      <label className="text-xs font-bold text-slate-600">出席番号
+                        <input value={data.studentInfo.number} onChange={e => setData(prev => ({...prev, studentInfo:{...prev.studentInfo, number:e.target.value}}))} className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 font-normal" />
+                      </label>
+                      <label className="text-xs font-bold text-slate-600">氏名
+                        <input value={data.studentInfo.name} onChange={e => setData(prev => ({...prev, studentInfo:{...prev.studentInfo, name:e.target.value}}))} className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 font-normal" />
+                      </label>
+                    </div>
+                    <label className="text-xs font-bold text-slate-600 block">単元名
+                      <input value={currentUnit.unitTitle} onChange={e => updateCurrentUnit(u => ({...u, unitTitle:e.target.value}))} className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 font-normal" />
+                    </label>
+                    <label className="text-xs font-bold text-slate-600 block">単元を貫く問い
+                      <textarea rows="2" value={currentUnit.centralQuestion} onChange={e => updateCurrentUnit(u => ({...u, centralQuestion:e.target.value}))} className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 font-normal resize-y" />
+                    </label>
+                    <label className="text-xs font-bold text-slate-600 block">目指す姿
+                      <textarea rows="2" value={currentUnit.targetGoal || ''} onChange={e => updateCurrentUnit(u => ({...u, targetGoal:e.target.value}))} className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 font-normal resize-y" />
+                    </label>
+                  </section>
+
+                  <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+                    <div className="flex flex-wrap gap-2 items-center justify-between">
+                      <h2 className="font-extrabold text-base">理解度を更新する</h2>
+                      <label className="flex items-center gap-2 text-xs text-slate-600">
+                        <input type="checkbox" checked={!!currentUnit.isManualOverall} onChange={() => updateCurrentUnit(u => ({...u, isManualOverall:!u.isManualOverall, manualOverallScore: effectiveOverall}))} />
+                        全体達成度を手動設定
+                      </label>
+                    </div>
+                    {currentUnit.isManualOverall && (
+                      <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex items-center gap-3">
+                        <input type="range" min="0" max="100" value={currentUnit.manualOverallScore ?? effectiveOverall} onChange={e => updateCurrentUnit(u => ({...u, manualOverallScore:Number(e.target.value)}))} className="flex-1" />
+                        <input type="number" min="0" max="100" value={currentUnit.manualOverallScore ?? effectiveOverall} onChange={e => updateCurrentUnit(u => ({...u, manualOverallScore:Math.max(0, Math.min(100, Number(e.target.value)||0))}))} className="w-20 border border-indigo-200 rounded-lg px-2 py-1.5 text-center font-bold" />
+                        <span className="text-xs font-bold">%</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      {currentUnit.viewpoints.map((vp, index) => (
+                        <div key={vp.id} className="border border-slate-200 rounded-xl p-3 bg-slate-50/60">
+                          <div className="flex gap-2 items-start">
+                            <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black flex-shrink-0">{index + 1}</div>
+                            <div className="flex-1 min-w-0 space-y-2">
+                              <input value={vp.name} onChange={e => updateCurrentUnit(u => ({...u, viewpoints:u.viewpoints.map(x => x.id === vp.id ? {...x,name:e.target.value}:x)}))} className="w-full bg-transparent border-b border-dashed border-slate-300 pb-1 text-sm font-bold focus:outline-none focus:border-indigo-400" />
+                              <div className="flex gap-3 items-center">
+                                <input type="range" min="0" max="100" value={vp.score} onChange={e => handleScoreChange(vp.id, e.target.value)} className="flex-1" />
+                                <input type="number" min="0" max="100" value={vp.score} onChange={e => handleScoreChange(vp.id, e.target.value)} className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-center font-black text-indigo-700" />
+                                <span className="text-xs font-bold">%</span>
+                              </div>
+                              <textarea rows="2" placeholder="根拠・分かったこと・まだ曖昧なこと" value={vp.note || ''} onChange={e => updateCurrentUnit(u => ({...u, viewpoints:u.viewpoints.map(x => x.id === vp.id ? {...x,note:e.target.value}:x)}))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white resize-y" />
+                            </div>
+                            <button title="観点を削除" onClick={() => currentUnit.viewpoints.length > 1 && updateCurrentUnit(u => ({...u, viewpoints:u.viewpoints.filter(x => x.id !== vp.id)}))} className="text-slate-400 hover:text-rose-600 p-1"><IconTrash /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input value={newViewpointName} onChange={e => setNewViewpointName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addViewpoint()} placeholder="新しい観点を追加" className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                      <button onClick={addViewpoint} className="bg-slate-800 hover:bg-slate-700 text-white rounded-lg px-3 py-2 text-xs font-bold flex items-center gap-1"><IconPlus />追加</button>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="space-y-4">
+                  <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <h2 className="font-extrabold text-base">本日の振り返り</h2>
+                      <span className="rounded-full bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-1 text-[11px] font-black">第{currentLessonNumber}回</span>
+                    </div>
+                    <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-4 text-center">
+                      <div className="text-5xl font-black text-indigo-700">{effectiveOverall}<span className="text-xl">%</span></div>
+                      <p className="text-xs text-indigo-600 mt-1">現在の達成度</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700">本日の振り返り <span className="text-rose-600">必須</span></label>
+                        <span className={`text-[10px] font-bold ${todayComment.trim() ? 'text-emerald-600' : 'text-rose-500'}`}>
+                          {todayComment.trim() ? '✓ 入力済み' : '未入力'}
+                        </span>
+                      </div>
+                      <textarea
+                        rows="6"
+                        required
+                        value={todayComment}
+                        onChange={e => { setTodayComment(e.target.value); if (errorMessage) setErrorMessage(''); }}
+                        placeholder="今日の学び、できるようになったこと、考えが変わったこと、次に確かめたいことなどを書こう。"
+                        className={`w-full rounded-xl px-3 py-3 text-sm resize-y border focus:outline-none focus:ring-2 ${todayComment.trim() ? 'border-slate-300 focus:ring-indigo-200' : 'border-rose-300 bg-rose-50/30 focus:ring-rose-200'}`}
+                      />
+                      <p className="text-[10px] text-slate-500">※振り返りを書かないと、この時間の記録は保存できません。</p>
+                    </div>
+                    <button
+                      onClick={handleSaveSnapshot}
+                      disabled={!todayComment.trim()}
+                      className={`w-full rounded-xl px-4 py-3 text-sm font-bold transition ${todayComment.trim() ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                    >
+                      第{currentLessonNumber}回として記録する
+                    </button>
+                  </section>
+
+                  <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-3">
+                    <h2 className="font-extrabold text-base">単元プリセット</h2>
+                    <p className="text-xs text-slate-500">選択すると既存単元へ切り替えるか、新しい単元として追加します。</p>
+                    {SOCIAL_PRESETS.map(p => (
+                      <button key={p.id} onClick={() => handleApplyPreset(p)} className="w-full text-left border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 rounded-xl p-3">
+                        <div className="text-xs font-bold text-slate-800">{p.unit}</div>
+                        <div className="text-[10px] text-slate-500 mt-1 line-clamp-2">{p.question}</div>
+                      </button>
+                    ))}
+                  </section>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'visual' && (
+              <div className="space-y-4">
+                <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+                  <div className="flex items-center gap-2 mb-4"><IconChart /><h2 className="font-extrabold">現在の理解度</h2></div>
+                  <div className="grid lg:grid-cols-2 gap-6">
+                    <div className="h-[330px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart data={radarData} outerRadius="72%">
+                          <PolarGrid />
+                          <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
+                          <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                          <Radar dataKey="value" stroke="#4f46e5" fill="#4f46e5" fillOpacity={0.25} />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-2">
+                      {currentUnit.viewpoints.map(vp => (
+                        <div key={vp.id} className="border border-slate-200 rounded-xl p-3">
+                          <div className="flex justify-between gap-3"><span className="text-sm font-bold">{vp.name}</span><span className="text-indigo-700 font-black">{vp.score}%</span></div>
+                          {vp.note && <p className="text-xs text-slate-500 mt-2 whitespace-pre-wrap">{vp.note}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+                <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+                  <div className="flex flex-wrap items-end justify-between gap-2 mb-4">
+                    <div>
+                      <h2 className="font-extrabold">達成度の推移</h2>
+                      <p className="text-[11px] text-slate-500 mt-1">全体達成度と、「理解度を更新する」で設定した各項目の変化を比較できます。</p>
+                    </div>
+                  </div>
+                  {chartData.length ? (
+                    <div className="h-[360px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="lesson" tick={{ fontSize: 10 }} />
+                          <YAxis domain={[0,100]} tick={{ fontSize: 10 }} />
+                          <Tooltip />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Line type="monotone" dataKey="全体達成度" name="全体達成度" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4 }} connectNulls />
+                          {currentUnit.viewpoints.map((vp, i) => (
+                            <Line
+                              key={vp.id}
+                              type="monotone"
+                              dataKey={vp.id}
+                              name={vp.name}
+                              stroke={viewpointColors[i % viewpointColors.length]}
+                              strokeWidth={1.8}
+                              dot={{ r: 3 }}
+                              connectNulls
+                            />
+                          ))}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : <p className="text-sm text-slate-500 bg-slate-50 rounded-xl p-6 text-center">まだ記録がありません。「この状態を記録する」で学びの軌跡がグラフになります。</p>}
+                </section>
+
+                <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div>
+                      <h2 className="font-extrabold">項目別の理解度推移</h2>
+                      <p className="text-[11px] text-slate-500 mt-1">見たい項目を選ぶと、その項目だけの変化を詳しく確認できます。</p>
+                    </div>
+                    {selectedViewpoint && (
+                      <div className="text-right">
+                        <div className="text-[10px] text-slate-500">現在</div>
+                        <div className="text-2xl font-black text-indigo-700">{selectedViewpoint.score}%</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {currentUnit.viewpoints.map((vp, i) => (
+                      <button
+                        key={vp.id}
+                        onClick={() => setSelectedViewpointId(vp.id)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition ${selectedViewpoint?.id === vp.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50'}`}
+                      >
+                        {i + 1}. {vp.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedViewpointHistory.length ? (
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={selectedViewpointHistory} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="lesson" tick={{ fontSize: 10 }} />
+                          <YAxis domain={[0,100]} tick={{ fontSize: 10 }} />
+                          <Tooltip formatter={(value) => [`${value}%`, selectedViewpoint?.name || '理解度']} />
+                          <Line type="monotone" dataKey="score" name={selectedViewpoint?.name || '理解度'} stroke="#4f46e5" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 7 }} connectNulls />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500 bg-slate-50 rounded-xl p-6 text-center">この項目の記録はまだありません。「この状態を記録する」を押すと推移が残ります。</p>
+                  )}
+                </section>
+              </div>
+            )}
+
+            {activeTab === 'history' && (
+              <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-3">
+                <h2 className="font-extrabold">記録履歴</h2>
+                {!currentUnit.snapshots?.length ? (
+                  <p className="text-sm text-slate-500 bg-slate-50 rounded-xl p-6 text-center">記録はまだありません。</p>
+                ) : [...currentUnit.snapshots].reverse().map(snap => (
+                  <article key={snap.id} className="border border-slate-200 rounded-xl p-4 flex gap-4 items-start">
+                    <div className="w-16 h-16 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-black text-xl flex-shrink-0">{snap.overall}%</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex rounded-full bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 text-[10px] font-black">第{Number(snap.lessonNumber) || (currentUnit.snapshots.indexOf(snap) + 1)}回</span>
+                        <div className="text-xs text-slate-500">{snap.displayDate || snap.date}</div>
+                      </div>
+                      <p className="text-sm mt-1 whitespace-pre-wrap">{snap.comment}</p>
+                    </div>
+                    <button onClick={() => updateCurrentUnit(u => ({...u, snapshots:u.snapshots.filter(s => s.id !== snap.id)}))} className="text-slate-400 hover:text-rose-600 p-1"><IconTrash /></button>
+                  </article>
+                ))}
+              </section>
+            )}
+          </main>
+
+          {showAddUnitModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4">
+                <div>
+                  <h2 className="text-lg font-extrabold text-slate-800">新しい単元を追加</h2>
+                  <p className="text-xs text-slate-500 mt-1">追加後は上の単元選択からいつでも切り替えられます。</p>
+                </div>
+
+                <label className="block text-xs font-bold text-slate-600">単元名 <span className="text-rose-500">*</span>
+                  <input
+                    autoFocus
+                    value={newUnitDraft.unitTitle}
+                    onChange={e => setNewUnitDraft(prev => ({...prev, unitTitle:e.target.value}))}
+                    placeholder="例：地方自治と私たち"
+                    className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-normal"
+                  />
+                </label>
+
+                <label className="block text-xs font-bold text-slate-600">単元を貫く問い
+                  <textarea
+                    rows="3"
+                    value={newUnitDraft.centralQuestion}
+                    onChange={e => setNewUnitDraft(prev => ({...prev, centralQuestion:e.target.value}))}
+                    placeholder="例：地方自治は民主主義の学校としての役割を果たしているのか"
+                    className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-normal resize-y"
+                  />
+                </label>
+
+                <label className="block text-xs font-bold text-slate-600">目指す姿
+                  <textarea
+                    rows="2"
+                    value={newUnitDraft.targetGoal}
+                    onChange={e => setNewUnitDraft(prev => ({...prev, targetGoal:e.target.value}))}
+                    placeholder="この単元でできるようになりたいこと"
+                    className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-normal resize-y"
+                  />
+                </label>
+
+                <label className="block text-xs font-bold text-slate-600">最初の理解度項目
+                  <input
+                    value={newUnitDraft.firstViewpoint}
+                    onChange={e => setNewUnitDraft(prev => ({...prev, firstViewpoint:e.target.value}))}
+                    className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-normal"
+                  />
+                </label>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setShowAddUnitModal(false)}
+                    className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleCreateUnit}
+                    className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5"
+                  >
+                    <IconPlus /> 追加する
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PDF専用レポート。画面外に常時描画し、html2canvasで日本語を含めて画像化する。 */}
+          <div ref={pdfRef} className="pdf-surface" style={{ position:'absolute', left:'-10000px', top:'0', width:'794px', background:'#fff', color:'#0f172a', padding:'36px', pointerEvents:'none' }}>
+            <div style={{ borderBottom:'3px solid #4338ca', paddingBottom:'14px', marginBottom:'20px' }}>
+              <div style={{ fontSize:'12px', color:'#64748b' }}>社会科「学びの可視化」レポート</div>
+              <div style={{ fontSize:'24px', fontWeight:800, marginTop:'4px' }}>{currentUnit.unitTitle}</div>
+              <div style={{ display:'flex', justifyContent:'space-between', marginTop:'12px', fontSize:'12px' }}>
+                <span>{data.studentInfo.className}　{data.studentInfo.number}番　{data.studentInfo.name}</span>
+                <span>現在：第{currentLessonNumber}回 ／ 出力日：{new Date().toLocaleDateString('ja-JP')}</span>
+              </div>
+            </div>
+
+            <div style={{ background:'#eef2ff', border:'1px solid #c7d2fe', borderRadius:'12px', padding:'16px', marginBottom:'18px' }}>
+              <div style={{ fontSize:'11px', fontWeight:700, color:'#4338ca' }}>単元を貫く問い</div>
+              <div style={{ fontSize:'15px', fontWeight:700, lineHeight:1.7, marginTop:'6px' }}>{currentUnit.centralQuestion}</div>
+              {currentUnit.targetGoal && <div style={{ fontSize:'11px', lineHeight:1.7, color:'#475569', marginTop:'10px' }}>目指す姿：{currentUnit.targetGoal}</div>}
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'180px 1fr', gap:'18px', alignItems:'stretch', marginBottom:'18px' }}>
+              <div style={{ border:'1px solid #e2e8f0', borderRadius:'12px', padding:'18px', textAlign:'center' }}>
+                <div style={{ fontSize:'12px', color:'#64748b' }}>現在の全体達成度</div>
+                <div style={{ fontSize:'52px', fontWeight:800, color:'#4338ca', lineHeight:1.2, marginTop:'8px' }}>{effectiveOverall}<span style={{fontSize:'22px'}}>%</span></div>
+                {diff !== null && <div style={{ fontSize:'11px', color: diff >= 0 ? '#059669' : '#e11d48', fontWeight:700, marginTop:'8px' }}>前回比 {diff >= 0 ? '+' : ''}{diff}%</div>}
+              </div>
+              <div style={{ border:'1px solid #e2e8f0', borderRadius:'12px', padding:'12px' }}>
+                <div style={{ fontSize:'12px', fontWeight:800, marginBottom:'6px' }}>現在の理解度バランス</div>
+                <RadarChart width={520} height={260} data={radarData} outerRadius="68%">
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10 }} />
+                  <PolarRadiusAxis domain={[0,100]} tick={{ fontSize: 9 }} />
+                  <Radar dataKey="value" stroke="#4f46e5" fill="#4f46e5" fillOpacity={0.25} />
+                </RadarChart>
+              </div>
+            </div>
+
+            <div style={{ marginBottom:'18px' }}>
+              <div style={{ fontSize:'14px', fontWeight:800, marginBottom:'10px' }}>観点別の理解度</div>
+              <div style={{ border:'1px solid #e2e8f0', borderRadius:'10px', overflow:'hidden' }}>
+                {currentUnit.viewpoints.map((vp, i) => (
+                  <div key={vp.id} style={{ display:'grid', gridTemplateColumns:'34px 1fr 70px', gap:'10px', padding:'10px 12px', borderTop:i ? '1px solid #e2e8f0' : 'none', alignItems:'start' }}>
+                    <div style={{ width:'24px', height:'24px', borderRadius:'12px', background:'#eef2ff', color:'#4338ca', fontSize:'11px', fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>{i+1}</div>
+                    <div>
+                      <div style={{ fontSize:'12px', fontWeight:800 }}>{vp.name}</div>
+                      {vp.note && <div style={{ fontSize:'10px', color:'#64748b', marginTop:'4px', lineHeight:1.6, whiteSpace:'pre-wrap' }}>{vp.note}</div>}
+                    </div>
+                    <div style={{ fontSize:'18px', fontWeight:800, color:'#4338ca', textAlign:'right' }}>{vp.score}%</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom:'18px' }}>
+              <div style={{ fontSize:'14px', fontWeight:800, marginBottom:'10px' }}>学びの推移</div>
+              {chartData.length ? (
+                <div style={{ border:'1px solid #e2e8f0', borderRadius:'10px', padding:'10px' }}>
+                  <LineChart width={700} height={260} data={chartData} margin={{ top:10, right:20, left:-10, bottom:5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="lesson" tick={{ fontSize:9 }} />
+                    <YAxis domain={[0,100]} tick={{ fontSize:9 }} />
+                    <Line type="monotone" dataKey="全体達成度" name="全体達成度" stroke="#4f46e5" strokeWidth={3} dot={{ r:3 }} connectNulls />
+                    {currentUnit.viewpoints.map((vp, i) => (
+                      <Line key={vp.id} type="monotone" dataKey={vp.id} name={vp.name} stroke={viewpointColors[i % viewpointColors.length]} strokeWidth={1.6} dot={{ r:2 }} connectNulls />
+                    ))}
+                  </LineChart>
+                </div>
+              ) : <div style={{ border:'1px solid #e2e8f0', borderRadius:'10px', padding:'18px', color:'#64748b', fontSize:'11px' }}>まだ振り返り記録がありません。</div>}
+            </div>
+
+            {!!chartData.length && (
+              <div style={{ marginBottom:'18px' }}>
+                <div style={{ fontSize:'14px', fontWeight:800, marginBottom:'10px' }}>各項目ごとの理解度推移</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+                  {currentUnit.viewpoints.map((vp, i) => (
+                    <div key={`pdf-vp-${vp.id}`} style={{ border:'1px solid #e2e8f0', borderRadius:'10px', padding:'10px' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
+                        <div style={{ fontSize:'11px', fontWeight:800 }}>{vp.name}</div>
+                        <div style={{ fontSize:'11px', fontWeight:800, color:viewpointColors[i % viewpointColors.length] }}>{vp.score}%</div>
+                      </div>
+                      <LineChart width={700} height={145} data={chartData} margin={{ top:8, right:18, left:-12, bottom:2 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="lesson" tick={{ fontSize:8 }} />
+                        <YAxis domain={[0,100]} tick={{ fontSize:8 }} />
+                        <Line type="monotone" dataKey={vp.id} name={vp.name} stroke={viewpointColors[i % viewpointColors.length]} strokeWidth={2.3} dot={{ r:2.5 }} connectNulls />
+                      </LineChart>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!!currentUnit.snapshots?.length && (
+              <div>
+                <div style={{ fontSize:'14px', fontWeight:800, marginBottom:'10px' }}>振り返り記録</div>
+                {currentUnit.snapshots.map((snap, i) => (
+                  <div key={snap.id} style={{ borderTop:'1px solid #e2e8f0', padding:'9px 0', display:'grid', gridTemplateColumns:'52px 110px 60px 1fr', gap:'10px', fontSize:'10px', lineHeight:1.6 }}>
+                    <div style={{ fontWeight:800, color:'#92400e' }}>第{Number(snap.lessonNumber) || (i + 1)}回</div>
+                    <div style={{ color:'#64748b' }}>{snap.displayDate || snap.date}</div>
+                    <div style={{ fontWeight:800, color:'#4338ca' }}>{snap.overall}%</div>
+                    <div>{snap.comment}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
