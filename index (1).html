@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
+  <link rel="icon" href="data:,">
+  <title>社会科「学びの可視化」アプリ</title>
+  <style>
+    :root {
+      --indigo-50:#eef2ff; --indigo-100:#e0e7ff; --indigo-200:#c7d2fe; --indigo-500:#6366f1; --indigo-600:#4f46e5; --indigo-700:#4338ca; --indigo-800:#3730a3; --indigo-950:#1e1b4b;
+      --emerald-50:#ecfdf5; --emerald-200:#a7f3d0; --emerald-600:#059669; --emerald-700:#047857;
+      --amber-50:#fffbeb; --amber-100:#fef3c7; --amber-200:#fde68a; --amber-500:#f59e0b; --amber-700:#b45309; --amber-800:#92400e;
+      --rose-50:#fff1f2; --rose-200:#fecdd3; --rose-600:#e11d48; --rose-700:#be123c;
+      --slate-50:#f8fafc; --slate-100:#f1f5f9; --slate-200:#e2e8f0; --slate-300:#cbd5e1; --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-700:#334155; --slate-800:#1e293b; --slate-900:#0f172a;
+      --shadow:0 1px 2px rgba(15,23,42,.06),0 2px 8px rgba(15,23,42,.04);
+    }
+    *{box-sizing:border-box}
+    html{background:var(--slate-50)}
+    body{margin:0;background:var(--slate-50);color:var(--slate-800);font-family:"Yu Gothic","YuGothic","Meiryo","Hiragino Kaku Gothic ProN",system-ui,-apple-system,sans-serif;line-height:1.5}
+    button,input,textarea,select{font:inherit}
+    button{cursor:pointer}
+    button:disabled{cursor:not-allowed;opacity:.5}
+    input[type="range"]{accent-color:var(--indigo-600);width:100%}
+    .app{min-height:100vh;padding-bottom:60px}
+    .header{position:sticky;top:0;z-index:40;background:var(--indigo-700);color:#fff;box-shadow:0 4px 12px rgba(15,23,42,.15)}
+    .header-main{max-width:1120px;margin:auto;padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .brand{display:flex;align-items:center;gap:10px}.brand-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);font-size:22px}.brand h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.01em}.brand p{font-size:11px;margin:2px 0 0;color:#c7d2fe}
+    .header-actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:.15s}.btn:hover{filter:brightness(1.05)}.btn-indigo{background:#4f46e5;color:#fff}.btn-green{background:#059669;color:#fff}.btn-dark{background:#334155;color:#fff}.btn-amber{background:#f59e0b;color:#fff}.btn-light{background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}.btn-danger{background:#fff1f2;color:#be123c;border:1px solid #fecdd3}
+    .filebar{background:rgba(30,27,75,.35);border-top:1px solid rgba(255,255,255,.12)}.filebar-inner{max-width:1120px;margin:auto;padding:7px 16px;display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:#e0e7ff}.good{color:#a7f3d0;font-weight:800}.warn{color:#fde68a;font-weight:800}
+    .container{max-width:1120px;margin:0 auto;padding:18px 16px}.stack{display:flex;flex-direction:column;gap:14px}
+    .card{background:#fff;border:1px solid var(--slate-200);border-radius:16px;box-shadow:var(--shadow);padding:18px}.card.compact{padding:14px}.card h2{font-size:16px;margin:0;font-weight:800}.card h3{font-size:14px;margin:0;font-weight:800}
+    .status{border-radius:12px;padding:11px 14px;font-size:13px;font-weight:700}.status.ok{background:var(--emerald-50);border:1px solid var(--emerald-200);color:var(--emerald-700)}.status.err{background:var(--rose-50);border:1px solid var(--rose-200);color:var(--rose-700)}
+    .security-note{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:12px;padding:10px 14px;font-size:11px;display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.security-note strong{font-weight:800}.security-controls{display:flex;align-items:center;gap:8px;white-space:nowrap}.security-controls label{display:flex;align-items:center;gap:5px}
+    .unit-summary{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start}.eyebrow{font-size:11px;font-weight:800;color:var(--indigo-600);margin-bottom:5px}.select{width:100%;max-width:640px;border:1px solid var(--slate-300);border-radius:9px;padding:9px 10px;background:#fff;font-size:13px;font-weight:700}.score-big{text-align:right}.score-big .num{font-size:40px;font-weight:900;color:var(--indigo-700);line-height:1}.score-big .label{font-size:11px;color:var(--slate-500);margin-top:5px}.score-big .diff{font-size:12px;font-weight:800;margin-top:5px}.positive{color:var(--emerald-600)}.negative{color:var(--rose-600)}
+    .lesson-badge{display:inline-flex;align-items:center;background:var(--amber-100);border:1px solid var(--amber-200);color:var(--amber-800);font-size:11px;font-weight:900;border-radius:999px;padding:4px 9px;margin-top:8px}
+    .tabs{background:#fff;border:1px solid var(--slate-200);border-radius:12px;padding:6px;display:flex;gap:5px}.tab{flex:1;border:0;border-radius:8px;background:transparent;color:var(--slate-600);font-size:12px;font-weight:800;padding:9px}.tab.active{background:var(--indigo-600);color:#fff;box-shadow:0 2px 6px rgba(79,70,229,.2)}
+    .grid-main{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:14px}.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.field{display:block;font-size:11px;font-weight:800;color:var(--slate-600)}.field input,.field textarea,.input{width:100%;margin-top:5px;border:1px solid var(--slate-300);border-radius:9px;padding:9px 10px;background:#fff;color:var(--slate-800);font-size:13px;font-weight:400;outline:none}.field input:focus,.field textarea:focus,.input:focus{border-color:#818cf8;box-shadow:0 0 0 3px rgba(99,102,241,.1)}textarea{resize:vertical}
+    .row{display:flex;align-items:center;gap:9px}.between{justify-content:space-between}.wrap{flex-wrap:wrap}.muted{color:var(--slate-500)}.tiny{font-size:10px}.small{font-size:12px}.bold{font-weight:800}
+    .vp-list{display:flex;flex-direction:column;gap:10px}.vp-card{border:1px solid var(--slate-200);border-radius:12px;padding:12px;background:rgba(248,250,252,.7);display:flex;gap:9px;align-items:flex-start}.vp-index{width:28px;height:28px;border-radius:50%;background:var(--indigo-100);color:var(--indigo-700);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex:0 0 auto}.vp-body{flex:1;min-width:0}.vp-name{width:100%;border:0;border-bottom:1px dashed var(--slate-300);background:transparent;padding:0 0 5px;font-size:13px;font-weight:800;outline:none}.vp-score-row{display:grid;grid-template-columns:1fr 76px 18px;gap:10px;align-items:center;margin-top:8px}.number-input{width:76px;border:1px solid var(--slate-300);border-radius:8px;padding:6px;text-align:center;font-weight:900;color:var(--indigo-700)}.vp-note{width:100%;border:1px solid var(--slate-200);border-radius:8px;padding:8px 9px;font-size:11px;margin-top:8px;background:#fff}.icon-btn{border:0;background:transparent;color:var(--slate-400);padding:4px;font-size:16px}.icon-btn:hover{color:var(--rose-600)}
+    .manual-box{background:var(--indigo-50);border:1px solid var(--indigo-100);border-radius:12px;padding:11px;display:grid;grid-template-columns:1fr 76px 18px;gap:10px;align-items:center}
+    .reflection-score{background:var(--indigo-50);border:1px solid var(--indigo-100);border-radius:12px;padding:14px;text-align:center}.reflection-score .num{font-size:46px;line-height:1;font-weight:900;color:var(--indigo-700)}.required{color:var(--rose-600);font-weight:900}.reflection-text{width:100%;border:1px solid var(--slate-300);border-radius:11px;padding:11px;font-size:13px;min-height:130px}.reflection-text.invalid{border-color:var(--rose-200);background:var(--rose-50)}
+    .preset{width:100%;text-align:left;border:1px solid var(--slate-200);border-radius:11px;padding:10px;background:#fff;margin-top:8px}.preset:hover{border-color:#a5b4fc;background:var(--indigo-50)}.preset-title{font-size:11px;font-weight:800}.preset-question{font-size:10px;color:var(--slate-500);margin-top:3px}
+    .chart-wrap{position:relative;height:340px}.chart-wrap.small{height:280px}.chart-canvas{display:block;width:100%;height:100%}.chart-empty{background:var(--slate-50);border-radius:12px;padding:26px;text-align:center;color:var(--slate-500);font-size:13px}
+    .current-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:16px}.vp-summary{display:flex;flex-direction:column;gap:8px}.vp-summary-item{border:1px solid var(--slate-200);border-radius:11px;padding:10px}.vp-summary-top{display:flex;justify-content:space-between;gap:10px}.vp-summary-score{font-weight:900;color:var(--indigo-700)}
+    .pills{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.pill{border:1px solid var(--slate-200);background:#fff;color:var(--slate-600);padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800}.pill.active{background:var(--indigo-600);border-color:var(--indigo-600);color:#fff}
+    .history{display:flex;flex-direction:column;gap:9px}.history-item{border:1px solid var(--slate-200);border-radius:12px;padding:12px;display:grid;grid-template-columns:62px 1fr auto;gap:12px;align-items:start}.history-score{width:62px;height:62px;border-radius:12px;background:var(--indigo-50);color:var(--indigo-700);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px}.history-meta{font-size:10px;color:var(--slate-500);display:flex;gap:8px;flex-wrap:wrap;align-items:center}.history-lesson{display:inline-flex;background:var(--amber-100);color:var(--amber-800);border:1px solid var(--amber-200);border-radius:999px;padding:2px 7px;font-weight:900}.history-comment{font-size:13px;margin-top:5px;white-space:pre-wrap}
+    .modal-backdrop{position:fixed;inset:0;z-index:100;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px}.modal{background:#fff;width:min(560px,100%);border-radius:16px;box-shadow:0 18px 60px rgba(15,23,42,.24);padding:20px}.modal h3{font-size:16px;margin:0}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}
+    .footer{max-width:1120px;margin:16px auto 0;padding:0 16px}.privacy{border-top:1px solid var(--slate-200);padding-top:12px;color:var(--slate-500);font-size:10px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .hidden{display:none!important}
+    @media(max-width:860px){.grid-main,.current-grid,.grid-2{grid-template-columns:1fr}.grid-3{grid-template-columns:1fr}.score-big{text-align:left}.unit-summary{grid-template-columns:1fr}.header-main{align-items:flex-start}.header-actions{width:100%}.header-actions .btn{flex:1}.history-item{grid-template-columns:56px 1fr auto}.history-score{width:56px;height:56px}}
+    @media(max-width:540px){.container{padding:12px 10px}.card{padding:14px}.brand p{display:none}.btn{padding:8px 9px}.vp-score-row,.manual-box{grid-template-columns:1fr 68px 18px}.security-controls{white-space:normal}}
+    @media print{.no-print{display:none!important}}
+  </style>
+</head>
+<body>
+<input id="fallbackFileInput" type="file" accept="application/json,.json" hidden>
+<div id="app"></div>
+
+<script>
+'use strict';
+
+const STORAGE_KEY = 'social_studies_vis_data_v12_secure';
+const LEGACY_KEYS = ['social_studies_vis_data_v11','social_studies_vis_data_v10','social_studies_vis_data_v9','social_studies_vis_data_v8','social_studies_vis_data_v7','social_studies_vis_data_v6'];
+const AUTO_SAVE_PREF_KEY = 'social_studies_vis_auto_save_enabled_v1';
+const FILE_HANDLE_DB = 'social_studies_vis_file_handle_db';
+const FILE_HANDLE_STORE = 'handles';
+const FILE_HANDLE_KEY = 'primary-data-file';
+const COLORS = ['#4f46e5','#059669','#d97706','#db2777','#0891b2','#7c3aed','#ea580c','#0f766e','#be123c'];
+
+const SOCIAL_PRESETS = [
+  {id:'unit-geo-1',unit:'持続可能な地域社会の形成（地理）',question:'地域の人口変化や自然環境を踏まえ、持続可能なまちづくりを行うにはどのような視点が必要だろうか？',targetGoal:'多角的な視点（防災・産業・人口）から地域の課題を分析し、根拠をもった持続可能なまちづくりの提案ができるようになる。',viewpoints:['自然環境と防災','産業・雇用と交通網','人口動態・高齢化','地域の歴史的背景','他地域・持続可能対策']},
+  {id:'unit-hist-1',unit:'近代日本の歩みと国際社会（歴史）',question:'明治維新以降の日本の近代化は、人々の生活や国際関係にどのような影響を与えただろうか？',targetGoal:'近代化の光と影の両面を捉え、歴史的資料に基づいて自分の考えをまとめ論理的に記述できるようになる。',viewpoints:['政治・憲法制度の変遷','産業革命と経済の発展','外交関係と条約改正','人々の暮らしと文化の変化','周辺国との関わり']},
+  {id:'unit-civ-1',unit:'現代の民主政治と日本国憲法（公民）',question:'個人の尊厳を守り、多様な人々が共に生きる社会をつくるために、私たちはどのように政治に関わるべきか？',targetGoal:'対立と合意の観点を理解し、主権者として社会課題に対する多様な意見を尊重しながら参画する意欲を高める。',viewpoints:['基本的人権の尊重','国会・内閣・裁判所の働き','地方自治と住民参加','メディアと情報活用','現代社会の課題解決']}
+];
+
+function createInitialData(){
+  return {
+    studentInfo:{className:'',number:'',name:''},
+    currentUnitId:'unit-geo-1',
+    units:[{
+      id:'unit-geo-1',
+      unitTitle:'持続可能な地域社会の形成（地理）',
+      centralQuestion:'地域の人口変化や自然環境を踏まえ、持続可能なまちづくりを行うにはどのような視点が必要だろうか？',
+      targetGoal:'多角的な視点（防災・産業・人口）から地域の課題を捉え、根拠のある持続可能な解決策を表現できるようになる。',
+      isManualOverall:false, manualOverallScore:60,
+      viewpoints:[
+        {id:'vp-1',name:'自然環境・災害への備え',score:65,note:''},
+        {id:'vp-2',name:'産業・交通網の現状',score:80,note:''},
+        {id:'vp-3',name:'人口変化と高齢化',score:45,note:''},
+        {id:'vp-4',name:'地域の歴史的背景',score:70,note:''}
+      ],
+      snapshots:[]
+    }]
+  };
+}
+
+function clampScore(v){ return Math.max(0,Math.min(100,Math.round(Number(v)||0))); }
+function esc(v){ return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function safeFileName(text){ return String(text||'生徒').replace(/[\\/:*?"<>|]/g,'_').trim()||'生徒'; }
+function dateForFile(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function studentLabel(){
+  const s=data.studentInfo||{};
+  if((s.name||'').trim()) return s.name.trim();
+  const fallback=[s.className,s.number?`${s.number}番`:null].filter(Boolean).join('_');
+  return fallback||'生徒';
+}
+function uuid(prefix){ return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`; }
+function isEmbeddedView(){ try{return window.self!==window.top}catch{return true} }
+function canUseNativeFilePicker(){ return !isEmbeddedView() && window.isSecureContext && typeof window.showOpenFilePicker==='function' && typeof window.showSaveFilePicker==='function'; }
+
+function normalizeImportedData(parsed){
+  if(!parsed || !Array.isArray(parsed.units) || !parsed.units.length) throw new Error('このファイルは学習データの形式ではありません。');
+  const units=parsed.units.map((unit,ui)=>{
+    const unitId=unit.id||`unit-import-${Date.now()}-${ui}`;
+    const viewpoints=Array.isArray(unit.viewpoints)&&unit.viewpoints.length ? unit.viewpoints.map((vp,vi)=>({
+      id:vp.id||`vp-import-${ui}-${vi}`, name:vp.name||`項目${vi+1}`, score:clampScore(vp.score), note:vp.note||''
+    })) : [{id:`vp-import-${ui}-0`,name:'学習内容の理解',score:50,note:''}];
+    return {
+      id:unitId, unitTitle:unit.unitTitle||unit.title||`単元${ui+1}`, centralQuestion:unit.centralQuestion||unit.question||'', targetGoal:unit.targetGoal||'',
+      isManualOverall:!!unit.isManualOverall, manualOverallScore:clampScore(unit.manualOverallScore), viewpoints,
+      snapshots:Array.isArray(unit.snapshots)?unit.snapshots.map((s,si)=>({...s,lessonNumber:Number(s.lessonNumber)||(si+1),overall:clampScore(s.overall),comment:s.comment||'',lessonGoal:s.lessonGoal||s.goal||''})):[]
+    };
+  });
+  const wanted=parsed.currentUnitId;
+  return {
+    ...parsed,
+    studentInfo:{className:parsed.studentInfo?.className||'',number:parsed.studentInfo?.number||'',name:parsed.studentInfo?.name||''},
+    currentUnitId:units.some(u=>u.id===wanted)?wanted:units[0].id,
+    units
+  };
+}
+
+function loadInitialData(){
+  const keys=[STORAGE_KEY,...LEGACY_KEYS];
+  for(const key of keys){
+    try{ const raw=localStorage.getItem(key); if(raw) return normalizeImportedData(JSON.parse(raw)); }catch(e){ console.warn('保存データの読み込みに失敗',e); }
+  }
+  return createInitialData();
+}
+
+let data=loadInitialData();
+let activeTab='input';
+let todayComment='';
+let todayGoal='';
+let newViewpointName='';
+let selectedViewpointId=null;
+let fileHandle=null;
+let fileName='';
+let filePermissionState='none';
+let statusMessage='';
+let errorMessage='';
+let statusTimer=null;
+let autoSaveEnabled=localStorage.getItem(AUTO_SAVE_PREF_KEY)!=='false';
+let modalOpen=false;
+let newUnitDraft={unitTitle:'',centralQuestion:'',targetGoal:'',firstViewpoint:'学習内容の理解'};
+
+function persistData(){
+  if(!autoSaveEnabled) return;
+  try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(data)); }catch(e){ console.warn('端末内自動保存に失敗',e); }
+}
+function clearLegacyLocalData(){ [STORAGE_KEY,...LEGACY_KEYS].forEach(k=>localStorage.removeItem(k)); }
+function currentUnit(){ return data.units.find(u=>u.id===data.currentUnitId)||data.units[0]; }
+function updateCurrentUnit(mutator){
+  const idx=data.units.findIndex(u=>u.id===data.currentUnitId);
+  if(idx<0) return;
+  const clone={...data.units[idx],viewpoints:data.units[idx].viewpoints.map(v=>({...v})),snapshots:[...(data.units[idx].snapshots||[])]};
+  mutator(clone);
+  data.units=[...data.units.slice(0,idx),clone,...data.units.slice(idx+1)];
+  persistData();
+}
+function calculatedOverall(unit=currentUnit()){
+  if(!unit?.viewpoints?.length) return 0;
+  return Math.round(unit.viewpoints.reduce((s,v)=>s+clampScore(v.score),0)/unit.viewpoints.length);
+}
+function effectiveOverall(unit=currentUnit()){ return unit.isManualOverall?clampScore(unit.manualOverallScore):calculatedOverall(unit); }
+function currentLessonNumber(unit=currentUnit()){
+  const ss=unit.snapshots||[]; if(!ss.length) return 1;
+  return ss.reduce((m,s,i)=>Math.max(m,Number(s.lessonNumber)||(i+1)),0)+1;
+}
+function lastSnapshot(unit=currentUnit()){ const s=unit.snapshots||[]; return s.length?s[s.length-1]:null; }
+function flash(msg){ statusMessage=msg; errorMessage=''; renderMessages(); if(statusTimer) clearTimeout(statusTimer); statusTimer=setTimeout(()=>{statusMessage='';renderMessages();},4500); }
+function fail(msg){ errorMessage=msg; renderMessages(); }
+
+function openFileHandleDb(){
+  return new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){resolve(null);return;}
+    const req=indexedDB.open(FILE_HANDLE_DB,1);
+    req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(FILE_HANDLE_STORE))db.createObjectStore(FILE_HANDLE_STORE)};
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+  });
+}
+async function rememberFileHandle(handle){
+  if(!handle) return;
+  try{const db=await openFileHandleDb();if(!db)return;await new Promise((res,rej)=>{const tx=db.transaction(FILE_HANDLE_STORE,'readwrite');tx.objectStore(FILE_HANDLE_STORE).put(handle,FILE_HANDLE_KEY);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);tx.onabort=()=>rej(tx.error)});db.close()}catch(e){console.warn('上書き先を記憶できませんでした',e)}
+}
+async function restoreRememberedFileHandle(){
+  try{const db=await openFileHandleDb();if(!db)return null;const handle=await new Promise((res,rej)=>{const tx=db.transaction(FILE_HANDLE_STORE,'readonly');const r=tx.objectStore(FILE_HANDLE_STORE).get(FILE_HANDLE_KEY);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)});db.close();return handle}catch(e){return null}
+}
+async function forgetRememberedFileHandle(){
+  try{const db=await openFileHandleDb();if(!db)return;await new Promise((res,rej)=>{const tx=db.transaction(FILE_HANDLE_STORE,'readwrite');tx.objectStore(FILE_HANDLE_STORE).delete(FILE_HANDLE_KEY);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close()}catch{}
+}
+async function ensureWritePermission(handle){
+  if(!handle?.queryPermission||!handle?.requestPermission) return true;
+  try{ if(await handle.queryPermission({mode:'readwrite'})==='granted')return true; return await handle.requestPermission({mode:'readwrite'})==='granted'; }catch{return false}
+}
+async function saveWithHandle(handle,text){
+  if(!await ensureWritePermission(handle)) return false;
+  const writable=await handle.createWritable(); await writable.write(text); await writable.close();
+  fileHandle=handle;fileName=handle.name||fileName;filePermissionState='granted';await rememberFileHandle(handle);return true;
+}
+async function loadFile(file,handle=null){
+  const raw=await file.text(); data=normalizeImportedData(JSON.parse(raw)); todayComment=''; todayGoal=''; selectedViewpointId=null; persistData();
+  fileHandle=handle;fileName=file.name||'';errorMessage='';
+  if(handle){await rememberFileHandle(handle);try{filePermissionState=handle.queryPermission?await handle.queryPermission({mode:'readwrite'}):'granted'}catch{filePermissionState='prompt'}}
+  else{filePermissionState='none';if(!isEmbeddedView())await forgetRememberedFileHandle()}
+  render();
+  flash(handle?`「${file.name}」を読み込みました。同じファイルへ上書きできます。`:`「${file.name}」を読み込みました。`);
+}
+async function openData(){
+  errorMessage='';renderMessages();
+  if(!canUseNativeFilePicker()){
+    document.getElementById('fallbackFileInput').click();
+    if(isEmbeddedView()) flash('埋め込み表示では通常のファイル選択を使います。上書き保存はGitHub Pagesを新しいタブで開くと利用できます。');
+    return;
+  }
+  try{
+    const [handle]=await window.showOpenFilePicker({multiple:false,types:[{description:'社会科 学習データ',accept:{'application/json':['.json']}}]});
+    await loadFile(await handle.getFile(),handle);
+  }catch(e){if(e?.name==='AbortError')return;fail(`ファイルを開けませんでした：${e.message||'不明なエラー'}`)}
+}
+function downloadBlob(blob,name){
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+async function saveData(forceNew=false){
+  const json=JSON.stringify(data,null,2);errorMessage='';renderMessages();
+  try{
+    if(fileHandle&&!forceNew){ if(await saveWithHandle(fileHandle,json)){flash(`「${fileHandle.name||fileName}」へ上書き保存しました。`);renderFilebar();return;} fileHandle=null;filePermissionState='none';await forgetRememberedFileHandle(); }
+    if(canUseNativeFilePicker()){
+      const handle=await window.showSaveFilePicker({suggestedName:fileName||`社会科学びの記録_${safeFileName(studentLabel())}.json`,types:[{description:'社会科 学習データ',accept:{'application/json':['.json']}}]});
+      if(!await saveWithHandle(handle,json)) throw new Error('ファイルへの書き込みが許可されませんでした。');
+      flash(`「${handle.name}」へ${forceNew?'別名保存':'保存'}しました。以後は同じファイルへ上書きします。`);renderFilebar();return;
+    }
+    const name=fileName||`社会科学びの記録_${safeFileName(studentLabel())}_${dateForFile()}.json`;
+    downloadBlob(new Blob([json],{type:'application/json;charset=utf-8'}),name);
+    flash('この表示環境では直接上書きできないため、JSONをダウンロードしました。');
+  }catch(e){if(e?.name==='AbortError')return;fail(`保存できませんでした：${e.message||'不明なエラー'}`)}
+}
+
+function chartSnapshots(unit=currentUnit()){
+  return (unit.snapshots||[]).map((s,i)=>({lesson:Number(s.lessonNumber)||(i+1),date:s.displayDate||s.date,overall:clampScore(s.overall),scores:s.scores||{}}));
+}
+function selectedVp(unit=currentUnit()){
+  const ids=unit.viewpoints.map(v=>v.id);if(!selectedViewpointId||!ids.includes(selectedViewpointId))selectedViewpointId=ids[0]||null;
+  return unit.viewpoints.find(v=>v.id===selectedViewpointId)||unit.viewpoints[0]||null;
+}
+
+function renderMessages(){
+  const box=document.getElementById('messages');if(!box)return;
+  box.innerHTML=`${statusMessage?`<div class="status ok">${esc(statusMessage)}</div>`:''}${errorMessage?`<div class="status err">${esc(errorMessage)}</div>`:''}`;
+}
+function renderFilebar(){
+  const el=document.getElementById('filebar-content');if(!el)return;
+  const native=canUseNativeFilePicker();
+  el.innerHTML=`<span>現在のファイル：${esc(fileName||'未選択（ブラウザ内の自動保存のみ）')}</span>${fileHandle?'<span class="good">✓ 同じファイルへ上書き可能</span>':native?'<span class="warn">初回の「上書き保存」で保存先を1つ決めます</span>':'<span class="warn">この表示では直接上書き不可</span>'}`;
+}
+function renderTopSummary(){
+  const unit=currentUnit(),overall=effectiveOverall(unit),last=lastSnapshot(unit),diff=last?overall-clampScore(last.overall):null;
+  const sel=document.getElementById('unitSelect');if(sel){sel.innerHTML=data.units.map(u=>`<option value="${esc(u.id)}" ${u.id===data.currentUnitId?'selected':''}>${esc(u.unitTitle)}</option>`).join('')}
+  const score=document.getElementById('topScore');if(score)score.innerHTML=`<div class="num">${overall}<span style="font-size:18px">%</span></div><div class="label">現在の全体達成度</div>${diff!==null?`<div class="diff ${diff>=0?'positive':'negative'}">前回比 ${diff>=0?'+':''}${diff}%</div>`:''}<div class="lesson-badge">現在 第${currentLessonNumber(unit)}回の授業</div>`;
+}
+
+function render(){
+  const unit=currentUnit(),overall=effectiveOverall(unit),lesson=currentLessonNumber(unit);
+  document.getElementById('app').innerHTML=`
+  <div class="app">
+    <header class="header no-print">
+      <div class="header-main">
+        <div class="brand"><div class="brand-icon">📖</div><div><h1>社会科「学びの可視化」アプリ</h1><p>探究の問いに対する理解度と学びの軌跡を記録する</p></div></div>
+        <div class="header-actions">
+          <button class="btn btn-indigo" id="openBtn">📂 開く</button>
+          <button class="btn btn-green" id="saveBtn">💾 上書き保存</button>
+          <button class="btn btn-dark" id="saveAsBtn">別名保存</button>
+          <button class="btn btn-amber" id="pdfBtn">📄 PDF出力</button>
+        </div>
+      </div>
+      <div class="filebar"><div class="filebar-inner" id="filebar-content"></div></div>
+    </header>
+    <main class="container stack">
+      <div id="messages"></div>
+      <div class="security-note">
+        <div><strong>学校利用向けセキュリティ版：</strong>このアプリはAIを使用せず、入力した氏名・振り返り・理解度をネットワークへ送信しません。外部CDN・解析ツールも使用していません。</div>
+        <div class="security-controls"><label><input type="checkbox" id="autoSaveToggle" ${autoSaveEnabled?'checked':''}> 端末内にも自動保存</label><button class="btn btn-light" id="clearLocalBtn" style="padding:5px 8px;font-size:10px">端末内データを消去</button></div>
+      </div>
+      <section class="card compact">
+        <div class="unit-summary">
+          <div><div class="eyebrow">現在の探究単元</div><div class="row wrap"><select id="unitSelect" class="select"></select><button class="btn btn-light" id="addUnitBtn">＋ 単元を追加</button></div></div>
+          <div class="score-big" id="topScore"></div>
+        </div>
+      </section>
+      <nav class="tabs no-print"><button class="tab ${activeTab==='input'?'active':''}" data-tab="input">入力・振り返り</button><button class="tab ${activeTab==='visual'?'active':''}" data-tab="visual">学びの可視化</button><button class="tab ${activeTab==='history'?'active':''}" data-tab="history">記録履歴</button></nav>
+      <div id="tabContent"></div>
+    </main>
+    <footer class="footer"><div class="privacy"><span>入力データの保存先：このブラウザ内（設定ON時）／生徒が選んだJSONファイル。外部サーバーへの回答送信機能はありません。</span><span>氏名は任意です。共有端末では「端末内にも自動保存」をOFFにしてください。</span></div></footer>
+    <div id="modalRoot"></div>
+  </div>`;
+  renderFilebar();renderMessages();renderTopSummary();renderTab();bindShellEvents();if(modalOpen)renderModal();
+}
+
+function bindShellEvents(){
+  document.getElementById('openBtn').onclick=openData;
+  document.getElementById('saveBtn').onclick=()=>saveData(false);
+  document.getElementById('saveAsBtn').onclick=()=>saveData(true);
+  document.getElementById('pdfBtn').onclick=exportPdf;
+  document.getElementById('addUnitBtn').onclick=()=>{modalOpen=true;newUnitDraft={unitTitle:'',centralQuestion:'',targetGoal:'',firstViewpoint:'学習内容の理解'};renderModal()};
+  document.getElementById('unitSelect').onchange=e=>{data.currentUnitId=e.target.value;selectedViewpointId=null;todayGoal='';todayComment='';persistData();render()};
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{activeTab=b.dataset.tab;render()});
+  document.getElementById('autoSaveToggle').onchange=e=>{autoSaveEnabled=e.target.checked;localStorage.setItem(AUTO_SAVE_PREF_KEY,String(autoSaveEnabled));if(autoSaveEnabled){persistData();flash('この端末への自動保存をONにしました。')}else{clearLegacyLocalData();flash('この端末への自動保存をOFFにし、ブラウザ内の学習データを消去しました。JSONファイルには影響しません。')}};
+  document.getElementById('clearLocalBtn').onclick=()=>{if(confirm('このブラウザ内に自動保存された学習データを消去します。現在画面に表示中のデータやJSONファイルは消えません。よろしいですか？')){clearLegacyLocalData();flash('ブラウザ内の自動保存データを消去しました。')}};
+}
+
+function renderTab(){
+  const root=document.getElementById('tabContent'); if(activeTab==='input')renderInput(root); else if(activeTab==='visual')renderVisual(root); else renderHistory(root);
+}
+
+function renderInput(root){
+  const u=currentUnit(),overall=effectiveOverall(u),lesson=currentLessonNumber(u);
+  root.innerHTML=`<div class="grid-main">
+    <div class="stack">
+      <section class="card stack">
+        <div class="row between wrap"><h2>学習者情報・単元設定</h2><span class="tiny muted">氏名は任意です。入力内容はネット送信されません。</span></div>
+        <div class="grid-3">
+          <label class="field">学年・学級<input id="classNameInput" value="${esc(data.studentInfo.className)}" autocomplete="off"></label>
+          <label class="field">出席番号<input id="numberInput" value="${esc(data.studentInfo.number)}" autocomplete="off"></label>
+          <label class="field">氏名（任意）<input id="nameInput" value="${esc(data.studentInfo.name)}" autocomplete="off" placeholder="未入力でも使えます"></label>
+        </div>
+        <label class="field">単元名<input id="unitTitleInput" value="${esc(u.unitTitle)}"></label>
+        <label class="field">単元を貫く問い<textarea id="questionInput" rows="2">${esc(u.centralQuestion)}</textarea></label>
+        <label class="field">目指す姿<textarea id="goalInput" rows="2">${esc(u.targetGoal||'')}</textarea></label>
+      </section>
+      <section class="card stack">
+        <div class="row between wrap"><h2>理解度を更新する</h2><label class="small muted row"><input type="checkbox" id="manualOverall" ${u.isManualOverall?'checked':''}> 全体達成度を手動設定</label></div>
+        ${u.isManualOverall?`<div class="manual-box"><input type="range" min="0" max="100" id="manualRange" value="${clampScore(u.manualOverallScore)}"><input class="number-input" type="number" min="0" max="100" id="manualNumber" value="${clampScore(u.manualOverallScore)}"><b>%</b></div>`:''}
+        <div class="vp-list">${u.viewpoints.map((v,i)=>viewpointEditorHtml(v,i)).join('')}</div>
+        <div class="row"><input class="input" id="newVpInput" value="${esc(newViewpointName)}" placeholder="新しい観点を追加" style="margin-top:0"><button class="btn btn-dark" id="addVpBtn">＋ 追加</button></div>
+      </section>
+    </div>
+    <div class="stack">
+      <section class="card stack">
+        <div class="row between"><h2>本日の振り返り</h2><span class="lesson-badge" style="margin:0">第${lesson}回</span></div>
+        <div class="reflection-score"><div class="num">${overall}<span style="font-size:20px">%</span></div><div class="small" style="color:#4f46e5;margin-top:5px">現在の達成度</div></div>
+        <label class="small bold">本時のめあて <span class="required">＊必須</span></label>
+        <textarea id="todayGoal" rows="3" class="reflection-text ${todayGoal.trim()?'':'invalid'}" placeholder="この時間に何ができるようになりたいか、何を明らかにしたいかを書こう">${esc(todayGoal)}</textarea>
+        <label class="small bold">今日の学び・振り返り <span class="required">＊必須</span></label>
+        <textarea id="todayComment" class="reflection-text ${todayComment.trim()?'':'invalid'}" placeholder="今日の学び、できるようになったこと、次に確かめたいこと…">${esc(todayComment)}</textarea>
+        <div id="recordRequirement" class="tiny ${(todayGoal.trim()&&todayComment.trim())?'muted':'required'}">${todayGoal.trim()&&todayComment.trim()?'めあてと振り返りが入力されています。':'めあてと振り返りの両方を書かないと記録できません。'}</div>
+        <button class="btn btn-indigo" id="saveSnapshotBtn" style="width:100%;padding:11px" ${(todayGoal.trim()&&todayComment.trim())?'':'disabled'}>第${lesson}回として記録する</button>
+      </section>
+      <section class="card"><h2>単元プリセット</h2><div class="tiny muted" style="margin-top:4px">選択すると既存単元へ切り替えるか、新しい単元として追加します。</div>${SOCIAL_PRESETS.map((p,i)=>`<button class="preset" data-preset="${i}"><div class="preset-title">${esc(p.unit)}</div><div class="preset-question">${esc(p.question)}</div></button>`).join('')}</section>
+    </div>
+  </div>`;
+  bindInputEvents();
+}
+function viewpointEditorHtml(v,i){ return `<div class="vp-card"><div class="vp-index">${i+1}</div><div class="vp-body"><input class="vp-name" data-vp-name="${esc(v.id)}" value="${esc(v.name)}"><div class="vp-score-row"><input type="range" min="0" max="100" value="${clampScore(v.score)}" data-vp-range="${esc(v.id)}"><input class="number-input" type="number" min="0" max="100" value="${clampScore(v.score)}" data-vp-number="${esc(v.id)}"><b>%</b></div><textarea rows="2" class="vp-note" data-vp-note="${esc(v.id)}" placeholder="根拠・分かったこと・まだ曖昧なこと">${esc(v.note||'')}</textarea></div><button class="icon-btn" data-vp-delete="${esc(v.id)}" title="観点を削除">🗑</button></div>`; }
+function bindInputEvents(){
+  const simple=[['classNameInput','className'],['numberInput','number'],['nameInput','name']];
+  simple.forEach(([id,key])=>document.getElementById(id).oninput=e=>{data.studentInfo={...data.studentInfo,[key]:e.target.value};persistData()});
+  document.getElementById('unitTitleInput').oninput=e=>{updateCurrentUnit(u=>u.unitTitle=e.target.value);const opt=document.querySelector(`#unitSelect option[value="${CSS.escape(data.currentUnitId)}"]`);if(opt)opt.textContent=e.target.value};
+  document.getElementById('questionInput').oninput=e=>updateCurrentUnit(u=>u.centralQuestion=e.target.value);
+  document.getElementById('goalInput').oninput=e=>updateCurrentUnit(u=>u.targetGoal=e.target.value);
+  document.getElementById('manualOverall').onchange=e=>{updateCurrentUnit(u=>{u.isManualOverall=e.target.checked;if(e.target.checked)u.manualOverallScore=calculatedOverall(u)});render()};
+  const syncOverall=(value)=>{updateCurrentUnit(u=>u.manualOverallScore=clampScore(value));renderTopSummary();const n=document.getElementById('manualNumber'),r=document.getElementById('manualRange');if(n)n.value=clampScore(value);if(r)r.value=clampScore(value)};
+  if(document.getElementById('manualRange'))document.getElementById('manualRange').oninput=e=>syncOverall(e.target.value);
+  if(document.getElementById('manualNumber'))document.getElementById('manualNumber').oninput=e=>syncOverall(e.target.value);
+  document.querySelectorAll('[data-vp-range]').forEach(el=>el.oninput=e=>changeVpScore(e.target.dataset.vpRange,e.target.value,e.target));
+  document.querySelectorAll('[data-vp-number]').forEach(el=>el.oninput=e=>changeVpScore(e.target.dataset.vpNumber,e.target.value,e.target));
+  document.querySelectorAll('[data-vp-name]').forEach(el=>el.oninput=e=>updateCurrentUnit(u=>{const v=u.viewpoints.find(x=>x.id===e.target.dataset.vpName);if(v)v.name=e.target.value}));
+  document.querySelectorAll('[data-vp-note]').forEach(el=>el.oninput=e=>updateCurrentUnit(u=>{const v=u.viewpoints.find(x=>x.id===e.target.dataset.vpNote);if(v)v.note=e.target.value}));
+  document.querySelectorAll('[data-vp-delete]').forEach(el=>el.onclick=e=>{const id=e.currentTarget.dataset.vpDelete;if(currentUnit().viewpoints.length<=1){fail('観点は少なくとも1つ必要です。');return}updateCurrentUnit(u=>u.viewpoints=u.viewpoints.filter(v=>v.id!==id));render()});
+  document.getElementById('newVpInput').oninput=e=>newViewpointName=e.target.value;
+  document.getElementById('newVpInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addVp()}};
+  document.getElementById('addVpBtn').onclick=addVp;
+  const syncRecordRequirement=()=>{const ok=!!(todayGoal.trim()&&todayComment.trim());const btn=document.getElementById('saveSnapshotBtn');if(btn)btn.disabled=!ok;const msg=document.getElementById('recordRequirement');if(msg){msg.className=`tiny ${ok?'muted':'required'}`;msg.textContent=ok?'めあてと振り返りが入力されています。':'めあてと振り返りの両方を書かないと記録できません。'}};
+  document.getElementById('todayGoal').oninput=e=>{todayGoal=e.target.value;e.target.classList.toggle('invalid',!todayGoal.trim());syncRecordRequirement()};
+  document.getElementById('todayComment').oninput=e=>{todayComment=e.target.value;e.target.classList.toggle('invalid',!todayComment.trim());syncRecordRequirement()};
+  document.getElementById('saveSnapshotBtn').onclick=saveSnapshot;
+  document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>applyPreset(SOCIAL_PRESETS[Number(b.dataset.preset)]));
+}
+function changeVpScore(id,val,source){
+  const score=clampScore(val);updateCurrentUnit(u=>{const v=u.viewpoints.find(x=>x.id===id);if(v)v.score=score});
+  const range=document.querySelector(`[data-vp-range="${CSS.escape(id)}"]`),num=document.querySelector(`[data-vp-number="${CSS.escape(id)}"]`);if(range&&range!==source)range.value=score;if(num&&num!==source)num.value=score;renderTopSummary();
+}
+function addVp(){const name=newViewpointName.trim();if(!name)return;updateCurrentUnit(u=>u.viewpoints.push({id:uuid('vp'),name,score:50,note:''}));newViewpointName='';render()}
+function saveSnapshot(){
+  if(!todayGoal.trim()){fail('本時のめあてを入力してから記録してください。');return}
+  if(!todayComment.trim()){fail('本日の振り返りを入力してから記録してください。');return}
+  const u=currentUnit(),now=new Date(),scores={};u.viewpoints.forEach(v=>scores[v.id]=clampScore(v.score));
+  const snapshot={id:uuid('snap'),lessonNumber:currentLessonNumber(u),date:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`,displayDate:`${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,scores,overall:effectiveOverall(u),lessonGoal:todayGoal.trim(),comment:todayComment.trim()};
+  updateCurrentUnit(x=>x.snapshots.push(snapshot));todayGoal='';todayComment='';render();flash(`第${snapshot.lessonNumber}回のめあてと振り返りを記録しました。`);
+}
+function applyPreset(p){
+  const ex=data.units.find(u=>u.unitTitle===p.unit);if(ex){data.currentUnitId=ex.id;selectedViewpointId=null;persistData();render();return}
+  const stamp=Date.now(),u={id:`unit-${stamp}`,unitTitle:p.unit,centralQuestion:p.question,targetGoal:p.targetGoal,isManualOverall:false,manualOverallScore:40,viewpoints:p.viewpoints.map((n,i)=>({id:`vp-${stamp}-${i}`,name:n,score:40,note:''})),snapshots:[]};data.units=[...data.units,u];data.currentUnitId=u.id;persistData();render();
+}
+
+function renderVisual(root){
+  const u=currentUnit(),vp=selectedVp(u),snaps=chartSnapshots(u);
+  root.innerHTML=`<div class="stack">
+    <section class="card"><div class="row" style="margin-bottom:12px"><span>📊</span><h2>現在の理解度</h2></div><div class="current-grid"><div class="chart-wrap small"><canvas id="radarCanvas" class="chart-canvas"></canvas></div><div class="vp-summary">${u.viewpoints.map(v=>`<div class="vp-summary-item"><div class="vp-summary-top"><span class="small bold">${esc(v.name)}</span><span class="vp-summary-score">${clampScore(v.score)}%</span></div>${v.note?`<div class="tiny muted" style="margin-top:5px;white-space:pre-wrap">${esc(v.note)}</div>`:''}</div>`).join('')}</div></div></section>
+    <section class="card"><h2 style="margin-bottom:12px">全体・各項目の理解度推移</h2>${snaps.length?'<div class="chart-wrap"><canvas id="trendCanvas" class="chart-canvas"></canvas></div>':'<div class="chart-empty">まだ記録がありません。「第○回として記録する」で学びの軌跡がグラフになります。</div>'}</section>
+    <section class="card"><div class="row between wrap"><h2>項目別の理解度推移</h2>${vp?`<div class="bold" style="color:#4338ca;font-size:22px">${clampScore(vp.score)}%</div>`:''}</div><div class="pills">${u.viewpoints.map(v=>`<button class="pill ${vp?.id===v.id?'active':''}" data-select-vp="${esc(v.id)}">${esc(v.name)}</button>`).join('')}</div>${snaps.some(s=>vp&&s.scores[vp.id]!==undefined)?'<div class="chart-wrap small"><canvas id="selectedTrendCanvas" class="chart-canvas"></canvas></div>':'<div class="chart-empty">この項目の記録はまだありません。</div>'}</section>
+  </div>`;
+  document.querySelectorAll('[data-select-vp]').forEach(b=>b.onclick=()=>{selectedViewpointId=b.dataset.selectVp;renderVisual(root)});
+  requestAnimationFrame(()=>{drawRadar(document.getElementById('radarCanvas'),u.viewpoints);if(snaps.length)drawTrend(document.getElementById('trendCanvas'),u,snaps,false);if(document.getElementById('selectedTrendCanvas')&&vp)drawSelectedTrend(document.getElementById('selectedTrendCanvas'),vp,snaps)});
+}
+
+function renderHistory(root){
+  const u=currentUnit();
+  root.innerHTML=`<section class="card"><div class="row between"><h2>記録履歴</h2><span class="small muted">全${u.snapshots.length}回</span></div><div class="history" style="margin-top:12px">${!u.snapshots.length?'<div class="chart-empty">記録はまだありません。</div>':[...u.snapshots].reverse().map(s=>historyHtml(s,u)).join('')}</div></section>`;
+  document.querySelectorAll('[data-delete-snap]').forEach(b=>b.onclick=()=>{const id=b.dataset.deleteSnap;if(confirm('この振り返り記録を削除しますか？')){updateCurrentUnit(x=>x.snapshots=x.snapshots.filter(s=>s.id!==id));render()}});
+}
+function historyHtml(s,u){const idx=u.snapshots.indexOf(s);return `<article class="history-item"><div class="history-score">${clampScore(s.overall)}%</div><div><div class="history-meta"><span class="history-lesson">第${Number(s.lessonNumber)||(idx+1)}回</span><span>${esc(s.displayDate||s.date||'')}</span></div>${s.lessonGoal?`<div class="history-comment" style="margin-top:7px"><strong style="color:#4338ca">めあて：</strong>${esc(s.lessonGoal)}</div>`:''}<div class="history-comment" style="margin-top:6px"><strong>振り返り：</strong>${esc(s.comment||'')}</div></div><button class="icon-btn" data-delete-snap="${esc(s.id)}" title="記録を削除">🗑</button></article>`}
+
+function renderModal(){
+  const root=document.getElementById('modalRoot');if(!modalOpen){root.innerHTML='';return}
+  root.innerHTML=`<div class="modal-backdrop"><div class="modal stack"><div class="row between"><h3>新しい単元を追加</h3><button class="icon-btn" id="closeModal">✕</button></div><label class="field">単元名<input id="newUnitTitle" value="${esc(newUnitDraft.unitTitle)}" placeholder="例：地方自治"></label><label class="field">単元を貫く問い<textarea id="newUnitQuestion" rows="2" placeholder="例：地方自治は民主主義の学校としての役割を果たしているのか">${esc(newUnitDraft.centralQuestion)}</textarea></label><label class="field">目指す姿<textarea id="newUnitGoal" rows="2">${esc(newUnitDraft.targetGoal)}</textarea></label><label class="field">最初の理解度項目<input id="newUnitVp" value="${esc(newUnitDraft.firstViewpoint)}"></label><div class="modal-actions"><button class="btn btn-light" id="cancelModal">キャンセル</button><button class="btn btn-indigo" id="createUnitBtn">単元を追加</button></div></div></div>`;
+  const close=()=>{modalOpen=false;renderModal()};document.getElementById('closeModal').onclick=close;document.getElementById('cancelModal').onclick=close;
+  [['newUnitTitle','unitTitle'],['newUnitQuestion','centralQuestion'],['newUnitGoal','targetGoal'],['newUnitVp','firstViewpoint']].forEach(([id,key])=>document.getElementById(id).oninput=e=>newUnitDraft[key]=e.target.value);
+  document.getElementById('createUnitBtn').onclick=()=>{if(!newUnitDraft.unitTitle.trim()){alert('単元名を入力してください。');return}const stamp=Date.now(),u={id:`unit-${stamp}`,unitTitle:newUnitDraft.unitTitle.trim(),centralQuestion:newUnitDraft.centralQuestion.trim(),targetGoal:newUnitDraft.targetGoal.trim(),isManualOverall:false,manualOverallScore:50,viewpoints:[{id:`vp-${stamp}-0`,name:newUnitDraft.firstViewpoint.trim()||'学習内容の理解',score:50,note:''}],snapshots:[]};data.units=[...data.units,u];data.currentUnitId=u.id;persistData();modalOpen=false;render();flash('新しい単元を追加しました。')};
+}
+
+function fitCanvas(canvas){
+  if(!canvas)return null;const rect=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(300,Math.round(rect.width*dpr));canvas.height=Math.max(180,Math.round(rect.height*dpr));const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return {ctx,w:rect.width,h:rect.height};
+}
+function drawRadar(canvas,vps){
+  const f=fitCanvas(canvas);if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);const cx=w/2,cy=h/2+5,r=Math.min(w,h)*.32,n=Math.max(vps.length,3);ctx.font='10px "Yu Gothic","Meiryo",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  for(let level=1;level<=5;level++){ctx.beginPath();for(let i=0;i<n;i++){const a=-Math.PI/2+i*2*Math.PI/n,rr=r*level/5,x=cx+Math.cos(a)*rr,y=cy+Math.sin(a)*rr;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.strokeStyle='#e2e8f0';ctx.stroke()}
+  for(let i=0;i<n;i++){const a=-Math.PI/2+i*2*Math.PI/n;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);ctx.strokeStyle='#e2e8f0';ctx.stroke();if(i<vps.length){let name=vps[i].name||'';if(name.length>11)name=name.slice(0,11)+'…';ctx.fillStyle='#475569';ctx.fillText(name,cx+Math.cos(a)*(r+28),cy+Math.sin(a)*(r+20))}}
+  if(vps.length){ctx.beginPath();vps.forEach((v,i)=>{const a=-Math.PI/2+i*2*Math.PI/vps.length,rr=r*clampScore(v.score)/100,x=cx+Math.cos(a)*rr,y=cy+Math.sin(a)*rr;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.closePath();ctx.fillStyle='rgba(79,70,229,.18)';ctx.fill();ctx.strokeStyle='#4f46e5';ctx.lineWidth=2;ctx.stroke();}
+}
+function drawChartBase(ctx,x,y,w,h,maxLesson){
+  ctx.fillStyle='#fff';ctx.fillRect(x,y,w,h);const left=x+48,right=x+w-18,top=y+18,bottom=y+h-42;ctx.strokeStyle='#cbd5e1';ctx.lineWidth=1;ctx.font='10px "Yu Gothic","Meiryo",sans-serif';ctx.fillStyle='#64748b';ctx.textAlign='right';ctx.textBaseline='middle';
+  for(let t=0;t<=100;t+=20){const yy=bottom-(bottom-top)*t/100;ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(right,yy);ctx.strokeStyle='#e2e8f0';ctx.stroke();ctx.fillText(String(t),left-7,yy)}
+  ctx.textAlign='center';for(let l=1;l<=maxLesson;l++){const xx=maxLesson===1?(left+right)/2:left+(right-left)*(l-1)/(maxLesson-1);ctx.fillStyle='#64748b';ctx.fillText(`第${l}回`,xx,bottom+18)}
+  return {left,right,top,bottom};
+}
+function drawSeries(ctx,box,points,color,maxLesson){
+  const valid=points.filter(p=>p.value!==undefined&&p.value!==null);if(!valid.length)return;ctx.beginPath();valid.forEach((p,i)=>{const x=maxLesson===1?(box.left+box.right)/2:box.left+(box.right-box.left)*(p.lesson-1)/(maxLesson-1),y=box.bottom-(box.bottom-box.top)*clampScore(p.value)/100;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.stroke();valid.forEach(p=>{const x=maxLesson===1?(box.left+box.right)/2:box.left+(box.right-box.left)*(p.lesson-1)/(maxLesson-1),y=box.bottom-(box.bottom-box.top)*clampScore(p.value)/100;ctx.beginPath();ctx.arc(x,y,3.5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill()})
+}
+function drawTrend(canvas,u,snaps){
+  const f=fitCanvas(canvas);if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);const maxLesson=Math.max(1,...snaps.map(s=>s.lesson));const box=drawChartBase(ctx,8,42,w-16,h-52,maxLesson);
+  drawSeries(ctx,box,snaps.map(s=>({lesson:s.lesson,value:s.overall})),'#4f46e5',maxLesson);u.viewpoints.forEach((v,i)=>drawSeries(ctx,box,snaps.map(s=>({lesson:s.lesson,value:s.scores[v.id]})),COLORS[(i+1)%COLORS.length],maxLesson));
+  ctx.font='10px "Yu Gothic","Meiryo",sans-serif';ctx.textAlign='left';let lx=14,ly=15;const defs=[['全体達成度','#4f46e5'],...u.viewpoints.map((v,i)=>[v.name,COLORS[(i+1)%COLORS.length]])];defs.forEach(([name,c])=>{const label=(name.length>14?name.slice(0,14)+'…':name);const tw=ctx.measureText(label).width+30;if(lx+tw>w-10){lx=14;ly+=16}ctx.fillStyle=c;ctx.fillRect(lx,ly-4,12,3);ctx.fillStyle='#475569';ctx.fillText(label,lx+16,ly);lx+=tw});
+}
+function drawSelectedTrend(canvas,vp,snaps){
+  const f=fitCanvas(canvas);if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);const maxLesson=Math.max(1,...snaps.map(s=>s.lesson));const box=drawChartBase(ctx,8,18,w-16,h-28,maxLesson);drawSeries(ctx,box,snaps.map(s=>({lesson:s.lesson,value:s.scores[vp.id]})),'#4f46e5',maxLesson);
+}
+
+// ---------- PDF（外部ライブラリ不使用） ----------
+function newReportPage(){ const c=document.createElement('canvas');c.width=1240;c.height=1754;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);return {canvas:c,ctx}; }
+function pdfFont(ctx,size=22,weight=400){ctx.font=`${weight} ${size}px "Yu Gothic","YuGothic","Meiryo",sans-serif`;ctx.textBaseline='top'}
+function wrapLines(ctx,text,maxWidth){
+  const out=[];String(text||'').split(/\n/).forEach(par=>{if(!par){out.push('');return}let line='';for(const ch of par){const test=line+ch;if(ctx.measureText(test).width>maxWidth&&line){out.push(line);line=ch}else line=test}if(line)out.push(line)});return out;
+}
+function drawWrapped(ctx,text,x,y,maxWidth,lineHeight,maxLines=Infinity){const lines=wrapLines(ctx,text,maxWidth).slice(0,maxLines);lines.forEach((l,i)=>ctx.fillText(l,x,y+i*lineHeight));return y+lines.length*lineHeight}
+function roundRect(ctx,x,y,w,h,r=14,fill='#fff',stroke='#e2e8f0'){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}
+function drawReportHeader(page,title,subtitle=''){const {ctx}=page;ctx.fillStyle='#4338ca';ctx.fillRect(0,0,1240,18);pdfFont(ctx,20,700);ctx.fillStyle='#64748b';ctx.fillText('社会科「学びの可視化」レポート',70,55);pdfFont(ctx,34,800);ctx.fillStyle='#0f172a';drawWrapped(ctx,title,70,92,1100,44,2);if(subtitle){pdfFont(ctx,18,400);ctx.fillStyle='#64748b';ctx.fillText(subtitle,70,185)}ctx.strokeStyle='#c7d2fe';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(70,220);ctx.lineTo(1170,220);ctx.stroke()}
+function drawRadarReport(ctx,x,y,w,h,vps){const cx=x+w/2,cy=y+h/2+5,r=Math.min(w,h)*.34,n=Math.max(vps.length,3);pdfFont(ctx,15,400);ctx.textAlign='center';ctx.textBaseline='middle';for(let level=1;level<=5;level++){ctx.beginPath();for(let i=0;i<n;i++){const a=-Math.PI/2+i*2*Math.PI/n,rr=r*level/5,xx=cx+Math.cos(a)*rr,yy=cy+Math.sin(a)*rr;i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)}ctx.closePath();ctx.strokeStyle='#e2e8f0';ctx.lineWidth=2;ctx.stroke()}for(let i=0;i<n;i++){const a=-Math.PI/2+i*2*Math.PI/n;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);ctx.strokeStyle='#e2e8f0';ctx.stroke();if(i<vps.length){let name=vps[i].name;if(name.length>10)name=name.slice(0,10)+'…';ctx.fillStyle='#475569';ctx.fillText(name,cx+Math.cos(a)*(r+50),cy+Math.sin(a)*(r+35))}}if(vps.length){ctx.beginPath();vps.forEach((v,i)=>{const a=-Math.PI/2+i*2*Math.PI/vps.length,rr=r*clampScore(v.score)/100,xx=cx+Math.cos(a)*rr,yy=cy+Math.sin(a)*rr;i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)});ctx.closePath();ctx.fillStyle='rgba(79,70,229,.18)';ctx.fill();ctx.strokeStyle='#4f46e5';ctx.lineWidth=4;ctx.stroke()}ctx.textAlign='left';ctx.textBaseline='top'}
+function drawReportChart(ctx,x,y,w,h,u,snaps,onlyVp=null){
+  roundRect(ctx,x,y,w,h,14,'#fff','#e2e8f0');const maxLesson=Math.max(1,...snaps.map(s=>s.lesson));const box=drawChartBase(ctx,x+15,y+46,w-30,h-60,maxLesson);if(onlyVp){drawSeries(ctx,box,snaps.map(s=>({lesson:s.lesson,value:s.scores[onlyVp.id]})),'#4f46e5',maxLesson)}else{drawSeries(ctx,box,snaps.map(s=>({lesson:s.lesson,value:s.overall})),'#4f46e5',maxLesson);u.viewpoints.forEach((v,i)=>drawSeries(ctx,box,snaps.map(s=>({lesson:s.lesson,value:s.scores[v.id]})),COLORS[(i+1)%COLORS.length],maxLesson))}
+}
+function buildReportPages(){
+  const u=currentUnit(),overall=effectiveOverall(u),snaps=chartSnapshots(u),pages=[];
+  let p=newReportPage();pages.push(p);drawReportHeader(p,u.unitTitle,`出力日：${new Date().toLocaleDateString('ja-JP')}`);let {ctx}=p;
+  pdfFont(ctx,18,400);ctx.fillStyle='#334155';const s=data.studentInfo;const info=[s.className,s.number?`${s.number}番`:'',s.name||'氏名未入力'].filter(Boolean).join('　');ctx.fillText(info||'学習者情報：未入力',70,245);
+  roundRect(ctx,70,285,1100,155,16,'#eef2ff','#c7d2fe');pdfFont(ctx,16,700);ctx.fillStyle='#4338ca';ctx.fillText('単元を貫く問い',95,310);pdfFont(ctx,23,700);ctx.fillStyle='#1e293b';drawWrapped(ctx,u.centralQuestion||'（未入力）',95,345,1045,34,3);
+  let y=465;if(u.targetGoal){pdfFont(ctx,16,700);ctx.fillStyle='#64748b';ctx.fillText('目指す姿',75,y);pdfFont(ctx,18,400);ctx.fillStyle='#334155';y=drawWrapped(ctx,u.targetGoal,75,y+28,1090,28,3)+20}else y+=10;
+  roundRect(ctx,70,y,300,330,16,'#fff','#e2e8f0');pdfFont(ctx,17,500);ctx.fillStyle='#64748b';ctx.textAlign='center';ctx.fillText('現在の全体達成度',220,y+35);pdfFont(ctx,72,800);ctx.fillStyle='#4338ca';ctx.fillText(`${overall}%`,220,y+90);pdfFont(ctx,18,700);ctx.fillStyle='#92400e';ctx.fillText(`現在 第${currentLessonNumber(u)}回の授業`,220,y+190);ctx.textAlign='left';
+  roundRect(ctx,395,y,775,330,16,'#fff','#e2e8f0');pdfFont(ctx,17,700);ctx.fillStyle='#1e293b';ctx.fillText('現在の理解度バランス',420,y+20);drawRadarReport(ctx,430,y+55,700,255,u.viewpoints);y+=365;
+  pdfFont(ctx,22,800);ctx.fillStyle='#0f172a';ctx.fillText('観点別の理解度',70,y);y+=42;
+  u.viewpoints.forEach((v,i)=>{const rowH=70;roundRect(ctx,70,y,1100,rowH,10,i%2?'#f8fafc':'#fff','#e2e8f0');pdfFont(ctx,18,800);ctx.fillStyle='#1e293b';ctx.fillText(`${i+1}. ${v.name}`,90,y+14);pdfFont(ctx,25,800);ctx.fillStyle='#4338ca';ctx.textAlign='right';ctx.fillText(`${clampScore(v.score)}%`,1140,y+13);ctx.textAlign='left';if(v.note){pdfFont(ctx,13,400);ctx.fillStyle='#64748b';drawWrapped(ctx,v.note,110,y+42,950,20,1)}y+=rowH+8;if(y>1650){p=newReportPage();pages.push(p);ctx=p.ctx;drawReportHeader(p,u.unitTitle,'観点別の理解度（続き）');y=255}});
+
+  // 学びの推移
+  p=newReportPage();pages.push(p);ctx=p.ctx;drawReportHeader(p,u.unitTitle,'学びの過程');y=255;pdfFont(ctx,22,800);ctx.fillStyle='#0f172a';ctx.fillText('全体・各項目の理解度推移',70,y);y+=45;
+  if(snaps.length){drawReportChart(ctx,70,y,1100,500,u,snaps,null);y+=535}else{roundRect(ctx,70,y,1100,100,12,'#f8fafc','#e2e8f0');pdfFont(ctx,18,400);ctx.fillStyle='#64748b';ctx.fillText('まだ振り返り記録がありません。',95,y+35);y+=135}
+  if(snaps.length){pdfFont(ctx,22,800);ctx.fillStyle='#0f172a';ctx.fillText('項目別の推移',70,y);y+=45;for(const v of u.viewpoints){if(y+320>1680){p=newReportPage();pages.push(p);ctx=p.ctx;drawReportHeader(p,u.unitTitle,'項目別の理解度推移');y=255}pdfFont(ctx,18,800);ctx.fillStyle='#334155';ctx.fillText(v.name,75,y);drawReportChart(ctx,70,y+32,1100,260,u,snaps,v);y+=325}}
+
+  // 振り返り履歴
+  if(snaps.length){p=newReportPage();pages.push(p);ctx=p.ctx;drawReportHeader(p,u.unitTitle,'めあて・振り返り記録');y=255;for(let i=0;i<u.snapshots.length;i++){const s=u.snapshots[i],lesson=Number(s.lessonNumber)||(i+1);pdfFont(ctx,16,400);const goalLines=wrapLines(ctx,s.lessonGoal||'',900),commentLines=wrapLines(ctx,s.comment||'',900);const goalCount=s.lessonGoal?Math.min(goalLines.length,4):0;const commentCount=Math.min(commentLines.length,6);const h=Math.max(110,78+goalCount*23+commentCount*23);if(y+h>1685){p=newReportPage();pages.push(p);ctx=p.ctx;drawReportHeader(p,u.unitTitle,'めあて・振り返り記録（続き）');y=255}roundRect(ctx,70,y,1100,h,12,'#fff','#e2e8f0');pdfFont(ctx,17,800);ctx.fillStyle='#92400e';ctx.fillText(`第${lesson}回`,92,y+17);pdfFont(ctx,15,400);ctx.fillStyle='#64748b';ctx.fillText(s.displayDate||s.date||'',185,y+19);pdfFont(ctx,24,800);ctx.fillStyle='#4338ca';ctx.textAlign='right';ctx.fillText(`${clampScore(s.overall)}%`,1135,y+14);ctx.textAlign='left';let ty=y+50;if(s.lessonGoal){pdfFont(ctx,15,800);ctx.fillStyle='#4338ca';ctx.fillText('めあて',92,ty);pdfFont(ctx,16,400);ctx.fillStyle='#1e293b';ty=drawWrapped(ctx,s.lessonGoal,170,ty,945,23,4)+12}pdfFont(ctx,15,800);ctx.fillStyle='#334155';ctx.fillText('振り返り',92,ty);pdfFont(ctx,16,400);ctx.fillStyle='#1e293b';drawWrapped(ctx,s.comment||'',190,ty,925,23,6);y+=h+12}}
+  return pages.map(p=>p.canvas);
+}
+function base64ToBytes(dataUrl){const b64=dataUrl.split(',')[1],bin=atob(b64),arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return arr}
+function asciiBytes(s){return new TextEncoder().encode(s)}
+function concatBytes(parts){const len=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(len);let o=0;for(const p of parts){out.set(p,o);o+=p.length}return out}
+function makePdfFromCanvases(canvases){
+  const images=canvases.map(c=>({bytes:base64ToBytes(c.toDataURL('image/jpeg',.86)),w:c.width,h:c.height}));const count=images.length,objCount=2+count*3;const objs=new Array(objCount+1);objs[1]={raw:`<< /Type /Catalog /Pages 2 0 R >>`};const kids=[];
+  images.forEach((im,i)=>{const pageObj=3+i*3,imgObj=4+i*3,contentObj=5+i*3;kids.push(`${pageObj} 0 R`);objs[pageObj]={raw:`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /Im0 ${imgObj} 0 R >> >> /Contents ${contentObj} 0 R >>`};objs[imgObj]={stream:im.bytes,head:`<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>`};const content=asciiBytes('q\n595.28 0 0 841.89 0 0 cm\n/Im0 Do\nQ\n');objs[contentObj]={stream:content,head:`<< /Length ${content.length} >>`}});objs[2]={raw:`<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${count} >>`};
+  const chunks=[asciiBytes('%PDF-1.4\n%LOCAL\n')],offsets=new Array(objCount+1).fill(0);let total=chunks[0].length;
+  for(let i=1;i<=objCount;i++){offsets[i]=total;const o=objs[i];let chunk;if(o.stream){chunk=concatBytes([asciiBytes(`${i} 0 obj\n${o.head}\nstream\n`),o.stream,asciiBytes('\nendstream\nendobj\n')])}else chunk=asciiBytes(`${i} 0 obj\n${o.raw}\nendobj\n`);chunks.push(chunk);total+=chunk.length}
+  const xrefOffset=total;let xref=`xref\n0 ${objCount+1}\n0000000000 65535 f \n`;for(let i=1;i<=objCount;i++)xref+=`${String(offsets[i]).padStart(10,'0')} 00000 n \n`;xref+=`trailer\n<< /Size ${objCount+1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;chunks.push(asciiBytes(xref));return new Blob(chunks,{type:'application/pdf'});
+}
+async function exportPdf(){
+  const btn=document.getElementById('pdfBtn');if(btn){btn.disabled=true;btn.textContent='PDF作成中…'}errorMessage='';renderMessages();
+  try{await new Promise(r=>setTimeout(r,40));const pages=buildReportPages(),blob=makePdfFromCanvases(pages),name=`社会科学びの可視化_${safeFileName(studentLabel())}_${dateForFile()}.pdf`;
+    if(!isEmbeddedView()&&window.isSecureContext&&typeof window.showSaveFilePicker==='function'){const handle=await window.showSaveFilePicker({suggestedName:name,types:[{description:'PDFファイル',accept:{'application/pdf':['.pdf']}}]});const w=await handle.createWritable();await w.write(blob);await w.close();flash(`PDFを「${handle.name||name}」として保存しました。`)}else{downloadBlob(blob,name);flash('PDFのダウンロードを開始しました。')}
+  }catch(e){if(e?.name==='AbortError'){flash('PDFの保存をキャンセルしました。')}else{console.error(e);fail(`PDFを出力できませんでした：${e.message||'不明なエラー'}`)}}finally{const b=document.getElementById('pdfBtn');if(b){b.disabled=false;b.textContent='📄 PDF出力'}}
+}
+
+// ファイル選択フォールバック
+document.getElementById('fallbackFileInput').addEventListener('change',async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{await loadFile(f,null)}catch(err){fail(`ファイルを読み込めませんでした：${err.message||'形式を確認してください'}`)}});
+
+window.addEventListener('resize',()=>{if(activeTab==='visual')renderVisual(document.getElementById('tabContent'))});
+
+(async function init(){
+  if(canUseNativeFilePicker()){
+    const h=await restoreRememberedFileHandle();if(h){fileHandle=h;fileName=h.name||'';try{filePermissionState=h.queryPermission?await h.queryPermission({mode:'readwrite'}):'prompt'}catch{filePermissionState='prompt'}}
+  }
+  render();
+})();
+</script>
+</body>
+</html>
