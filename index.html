@@ -120,7 +120,7 @@ function normalizeImportedData(parsed){
     return {
       id:unitId, unitTitle:unit.unitTitle||unit.title||`単元${ui+1}`, centralQuestion:unit.centralQuestion||unit.question||'', targetGoal:unit.targetGoal||'',
       isManualOverall:!!unit.isManualOverall, manualOverallScore:clampScore(unit.manualOverallScore), viewpoints,
-      snapshots:Array.isArray(unit.snapshots)?unit.snapshots.map((s,si)=>({...s,lessonNumber:Number(s.lessonNumber)||(si+1),overall:clampScore(s.overall),comment:s.comment||'',lessonGoal:s.lessonGoal||s.goal||''})):[]
+      snapshots:Array.isArray(unit.snapshots)?unit.snapshots.map((s,si)=>({...s,lessonNumber:Number(s.lessonNumber)||(si+1),overall:clampScore(s.overall),comment:s.comment||'',lessonGoal:s.lessonGoal||s.goal||'',nextQuestion:s.nextQuestion||''})):[]
     };
   });
   const wanted=parsed.currentUnitId;
@@ -144,6 +144,7 @@ let data=loadInitialData();
 let activeTab='input';
 let todayComment='';
 let todayGoal='';
+let todayNextQuestion='';
 let newViewpointName='';
 let selectedViewpointId=null;
 let fileHandle=null;
@@ -211,7 +212,7 @@ async function saveWithHandle(handle,text){
   fileHandle=handle;fileName=handle.name||fileName;filePermissionState='granted';await rememberFileHandle(handle);return true;
 }
 async function loadFile(file,handle=null){
-  const raw=await file.text(); data=normalizeImportedData(JSON.parse(raw)); todayComment=''; todayGoal=''; selectedViewpointId=null; persistData();
+  const raw=await file.text(); data=normalizeImportedData(JSON.parse(raw)); todayComment=''; todayGoal=''; todayNextQuestion=''; selectedViewpointId=null; persistData();
   fileHandle=handle;fileName=file.name||'';errorMessage='';
   if(handle){await rememberFileHandle(handle);try{filePermissionState=handle.queryPermission?await handle.queryPermission({mode:'readwrite'}):'granted'}catch{filePermissionState='prompt'}}
   else{filePermissionState='none';if(!isEmbeddedView())await forgetRememberedFileHandle()}
@@ -314,7 +315,7 @@ function bindShellEvents(){
   document.getElementById('saveAsBtn').onclick=()=>saveData(true);
   document.getElementById('pdfBtn').onclick=exportPdf;
   document.getElementById('addUnitBtn').onclick=()=>{modalOpen=true;newUnitDraft={unitTitle:'',centralQuestion:'',targetGoal:'',firstViewpoint:'学習内容の理解'};renderModal()};
-  document.getElementById('unitSelect').onchange=e=>{data.currentUnitId=e.target.value;selectedViewpointId=null;todayGoal='';todayComment='';persistData();render()};
+  document.getElementById('unitSelect').onchange=e=>{data.currentUnitId=e.target.value;selectedViewpointId=null;todayGoal='';todayComment='';todayNextQuestion='';persistData();render()};
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{activeTab=b.dataset.tab;render()});
   document.getElementById('autoSaveToggle').onchange=e=>{autoSaveEnabled=e.target.checked;localStorage.setItem(AUTO_SAVE_PREF_KEY,String(autoSaveEnabled));if(autoSaveEnabled){persistData();flash('この端末への自動保存をONにしました。')}else{clearLegacyLocalData();flash('この端末への自動保存をOFFにし、ブラウザ内の学習データを消去しました。JSONファイルには影響しません。')}};
   document.getElementById('clearLocalBtn').onclick=()=>{if(confirm('このブラウザ内に自動保存された学習データを消去します。現在画面に表示中のデータやJSONファイルは消えません。よろしいですか？')){clearLegacyLocalData();flash('ブラウザ内の自動保存データを消去しました。')}};
@@ -326,6 +327,8 @@ function renderTab(){
 
 function renderInput(root){
   const u=currentUnit(),overall=effectiveOverall(u),lesson=currentLessonNumber(u);
+  const previousSnapshot=(u.snapshots||[])[u.snapshots.length-1]||null;
+  const previousNextQuestion=previousSnapshot?.nextQuestion||'';
   root.innerHTML=`<div class="grid-main">
     <div class="stack">
       <section class="card stack">
@@ -350,12 +353,18 @@ function renderInput(root){
       <section class="card stack">
         <div class="row between"><h2>本日の振り返り</h2><span class="lesson-badge" style="margin:0">第${lesson}回</span></div>
         <div class="reflection-score"><div class="num">${overall}<span style="font-size:20px">%</span></div><div class="small" style="color:#4f46e5;margin-top:5px">現在の達成度</div></div>
+        <div style="border:1px solid #c7d2fe;background:#eef2ff;border-radius:12px;padding:12px 14px">
+          <div class="tiny bold" style="color:#4338ca;margin-bottom:5px">前時に立てた「次時への問い」</div>
+          ${previousNextQuestion?`<div class="small" style="line-height:1.7;color:#1e293b;white-space:pre-wrap">${esc(previousNextQuestion)}</div>`:`<div class="tiny muted">前時の問いはまだありません。今回の学習の終わりに「次時への問い」を立てよう。</div>`}
+        </div>
         <label class="small bold">本時のめあて <span class="required">＊必須</span></label>
-        <textarea id="todayGoal" rows="3" class="reflection-text ${todayGoal.trim()?'':'invalid'}" placeholder="この時間に何ができるようになりたいか、何を明らかにしたいかを書こう">${esc(todayGoal)}</textarea>
+        <textarea id="todayGoal" rows="3" class="reflection-text ${todayGoal.trim()?'':'invalid'}" placeholder="前時の問いも参考にして、この時間に何を明らかにしたいか、何ができるようになりたいかを書こう">${esc(todayGoal)}</textarea>
         <label class="small bold">今日の学び・振り返り <span class="required">＊必須</span></label>
-        <textarea id="todayComment" class="reflection-text ${todayComment.trim()?'':'invalid'}" placeholder="今日の学び、できるようになったこと、次に確かめたいこと…">${esc(todayComment)}</textarea>
-        <div id="recordRequirement" class="tiny ${(todayGoal.trim()&&todayComment.trim())?'muted':'required'}">${todayGoal.trim()&&todayComment.trim()?'めあてと振り返りが入力されています。':'めあてと振り返りの両方を書かないと記録できません。'}</div>
-        <button class="btn btn-indigo" id="saveSnapshotBtn" style="width:100%;padding:11px" ${(todayGoal.trim()&&todayComment.trim())?'':'disabled'}>第${lesson}回として記録する</button>
+        <textarea id="todayComment" class="reflection-text ${todayComment.trim()?'':'invalid'}" placeholder="今日の学び、できるようになったこと、考えが変わったことを書こう">${esc(todayComment)}</textarea>
+        <label class="small bold">次時への問い <span class="required">＊必須</span></label>
+        <textarea id="todayNextQuestion" rows="3" class="reflection-text ${todayNextQuestion.trim()?'':'invalid'}" placeholder="今日の学習を終えて、次の時間に確かめたいこと・さらに考えたいことを問いの形で書こう">${esc(todayNextQuestion)}</textarea>
+        <div id="recordRequirement" class="tiny ${(todayGoal.trim()&&todayComment.trim()&&todayNextQuestion.trim())?'muted':'required'}">${todayGoal.trim()&&todayComment.trim()&&todayNextQuestion.trim()?'めあて・振り返り・次時への問いが入力されています。':'めあて・振り返り・次時への問いの3つを書かないと記録できません。'}</div>
+        <button class="btn btn-indigo" id="saveSnapshotBtn" style="width:100%;padding:11px" ${(todayGoal.trim()&&todayComment.trim()&&todayNextQuestion.trim())?'':'disabled'}>第${lesson}回として記録する</button>
       </section>
       <section class="card"><h2>単元プリセット</h2><div class="tiny muted" style="margin-top:4px">選択すると既存単元へ切り替えるか、新しい単元として追加します。</div>${SOCIAL_PRESETS.map((p,i)=>`<button class="preset" data-preset="${i}"><div class="preset-title">${esc(p.unit)}</div><div class="preset-question">${esc(p.question)}</div></button>`).join('')}</section>
     </div>
@@ -381,9 +390,10 @@ function bindInputEvents(){
   document.getElementById('newVpInput').oninput=e=>newViewpointName=e.target.value;
   document.getElementById('newVpInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addVp()}};
   document.getElementById('addVpBtn').onclick=addVp;
-  const syncRecordRequirement=()=>{const ok=!!(todayGoal.trim()&&todayComment.trim());const btn=document.getElementById('saveSnapshotBtn');if(btn)btn.disabled=!ok;const msg=document.getElementById('recordRequirement');if(msg){msg.className=`tiny ${ok?'muted':'required'}`;msg.textContent=ok?'めあてと振り返りが入力されています。':'めあてと振り返りの両方を書かないと記録できません。'}};
+  const syncRecordRequirement=()=>{const ok=!!(todayGoal.trim()&&todayComment.trim()&&todayNextQuestion.trim());const btn=document.getElementById('saveSnapshotBtn');if(btn)btn.disabled=!ok;const msg=document.getElementById('recordRequirement');if(msg){msg.className=`tiny ${ok?'muted':'required'}`;msg.textContent=ok?'めあて・振り返り・次時への問いが入力されています。':'めあて・振り返り・次時への問いの3つを書かないと記録できません。'}};
   document.getElementById('todayGoal').oninput=e=>{todayGoal=e.target.value;e.target.classList.toggle('invalid',!todayGoal.trim());syncRecordRequirement()};
   document.getElementById('todayComment').oninput=e=>{todayComment=e.target.value;e.target.classList.toggle('invalid',!todayComment.trim());syncRecordRequirement()};
+  document.getElementById('todayNextQuestion').oninput=e=>{todayNextQuestion=e.target.value;e.target.classList.toggle('invalid',!todayNextQuestion.trim());syncRecordRequirement()};
   document.getElementById('saveSnapshotBtn').onclick=saveSnapshot;
   document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>applyPreset(SOCIAL_PRESETS[Number(b.dataset.preset)]));
 }
@@ -395,9 +405,10 @@ function addVp(){const name=newViewpointName.trim();if(!name)return;updateCurren
 function saveSnapshot(){
   if(!todayGoal.trim()){fail('本時のめあてを入力してから記録してください。');return}
   if(!todayComment.trim()){fail('本日の振り返りを入力してから記録してください。');return}
+  if(!todayNextQuestion.trim()){fail('次時への問いを入力してから記録してください。');return}
   const u=currentUnit(),now=new Date(),scores={};u.viewpoints.forEach(v=>scores[v.id]=clampScore(v.score));
-  const snapshot={id:uuid('snap'),lessonNumber:currentLessonNumber(u),date:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`,displayDate:`${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,scores,overall:effectiveOverall(u),lessonGoal:todayGoal.trim(),comment:todayComment.trim()};
-  updateCurrentUnit(x=>x.snapshots.push(snapshot));todayGoal='';todayComment='';render();flash(`第${snapshot.lessonNumber}回のめあてと振り返りを記録しました。`);
+  const snapshot={id:uuid('snap'),lessonNumber:currentLessonNumber(u),date:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`,displayDate:`${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,scores,overall:effectiveOverall(u),lessonGoal:todayGoal.trim(),comment:todayComment.trim(),nextQuestion:todayNextQuestion.trim()};
+  updateCurrentUnit(x=>x.snapshots.push(snapshot));todayGoal='';todayComment='';todayNextQuestion='';render();flash(`第${snapshot.lessonNumber}回のめあて・振り返り・次時への問いを記録しました。`);
 }
 function applyPreset(p){
   const ex=data.units.find(u=>u.unitTitle===p.unit);if(ex){data.currentUnitId=ex.id;selectedViewpointId=null;persistData();render();return}
@@ -420,7 +431,7 @@ function renderHistory(root){
   root.innerHTML=`<section class="card"><div class="row between"><h2>記録履歴</h2><span class="small muted">全${u.snapshots.length}回</span></div><div class="history" style="margin-top:12px">${!u.snapshots.length?'<div class="chart-empty">記録はまだありません。</div>':[...u.snapshots].reverse().map(s=>historyHtml(s,u)).join('')}</div></section>`;
   document.querySelectorAll('[data-delete-snap]').forEach(b=>b.onclick=()=>{const id=b.dataset.deleteSnap;if(confirm('この振り返り記録を削除しますか？')){updateCurrentUnit(x=>x.snapshots=x.snapshots.filter(s=>s.id!==id));render()}});
 }
-function historyHtml(s,u){const idx=u.snapshots.indexOf(s);return `<article class="history-item"><div class="history-score">${clampScore(s.overall)}%</div><div><div class="history-meta"><span class="history-lesson">第${Number(s.lessonNumber)||(idx+1)}回</span><span>${esc(s.displayDate||s.date||'')}</span></div>${s.lessonGoal?`<div class="history-comment" style="margin-top:7px"><strong style="color:#4338ca">めあて：</strong>${esc(s.lessonGoal)}</div>`:''}<div class="history-comment" style="margin-top:6px"><strong>振り返り：</strong>${esc(s.comment||'')}</div></div><button class="icon-btn" data-delete-snap="${esc(s.id)}" title="記録を削除">🗑</button></article>`}
+function historyHtml(s,u){const idx=u.snapshots.indexOf(s);return `<article class="history-item"><div class="history-score">${clampScore(s.overall)}%</div><div><div class="history-meta"><span class="history-lesson">第${Number(s.lessonNumber)||(idx+1)}回</span><span>${esc(s.displayDate||s.date||'')}</span></div>${s.lessonGoal?`<div class="history-comment" style="margin-top:7px"><strong style="color:#4338ca">めあて：</strong>${esc(s.lessonGoal)}</div>`:''}<div class="history-comment" style="margin-top:6px"><strong>振り返り：</strong>${esc(s.comment||'')}</div>${s.nextQuestion?`<div class="history-comment" style="margin-top:6px"><strong style="color:#0f766e">次時への問い：</strong>${esc(s.nextQuestion)}</div>`:''}</div><button class="icon-btn" data-delete-snap="${esc(s.id)}" title="記録を削除">🗑</button></article>`}
 
 function renderModal(){
   const root=document.getElementById('modalRoot');if(!modalOpen){root.innerHTML='';return}
@@ -487,7 +498,7 @@ function buildReportPages(){
   if(snaps.length){pdfFont(ctx,22,800);ctx.fillStyle='#0f172a';ctx.fillText('項目別の推移',70,y);y+=45;for(const v of u.viewpoints){if(y+320>1680){p=newReportPage();pages.push(p);ctx=p.ctx;drawReportHeader(p,u.unitTitle,'項目別の理解度推移');y=255}pdfFont(ctx,18,800);ctx.fillStyle='#334155';ctx.fillText(v.name,75,y);drawReportChart(ctx,70,y+32,1100,260,u,snaps,v);y+=325}}
 
   // 振り返り履歴
-  if(snaps.length){p=newReportPage();pages.push(p);ctx=p.ctx;drawReportHeader(p,u.unitTitle,'めあて・振り返り記録');y=255;for(let i=0;i<u.snapshots.length;i++){const s=u.snapshots[i],lesson=Number(s.lessonNumber)||(i+1);pdfFont(ctx,16,400);const goalLines=wrapLines(ctx,s.lessonGoal||'',900),commentLines=wrapLines(ctx,s.comment||'',900);const goalCount=s.lessonGoal?Math.min(goalLines.length,4):0;const commentCount=Math.min(commentLines.length,6);const h=Math.max(110,78+goalCount*23+commentCount*23);if(y+h>1685){p=newReportPage();pages.push(p);ctx=p.ctx;drawReportHeader(p,u.unitTitle,'めあて・振り返り記録（続き）');y=255}roundRect(ctx,70,y,1100,h,12,'#fff','#e2e8f0');pdfFont(ctx,17,800);ctx.fillStyle='#92400e';ctx.fillText(`第${lesson}回`,92,y+17);pdfFont(ctx,15,400);ctx.fillStyle='#64748b';ctx.fillText(s.displayDate||s.date||'',185,y+19);pdfFont(ctx,24,800);ctx.fillStyle='#4338ca';ctx.textAlign='right';ctx.fillText(`${clampScore(s.overall)}%`,1135,y+14);ctx.textAlign='left';let ty=y+50;if(s.lessonGoal){pdfFont(ctx,15,800);ctx.fillStyle='#4338ca';ctx.fillText('めあて',92,ty);pdfFont(ctx,16,400);ctx.fillStyle='#1e293b';ty=drawWrapped(ctx,s.lessonGoal,170,ty,945,23,4)+12}pdfFont(ctx,15,800);ctx.fillStyle='#334155';ctx.fillText('振り返り',92,ty);pdfFont(ctx,16,400);ctx.fillStyle='#1e293b';drawWrapped(ctx,s.comment||'',190,ty,925,23,6);y+=h+12}}
+  if(snaps.length){p=newReportPage();pages.push(p);ctx=p.ctx;drawReportHeader(p,u.unitTitle,'めあて・振り返り・次時への問い');y=255;for(let i=0;i<u.snapshots.length;i++){const s=u.snapshots[i],lesson=Number(s.lessonNumber)||(i+1);pdfFont(ctx,16,400);const goalLines=wrapLines(ctx,s.lessonGoal||'',900),commentLines=wrapLines(ctx,s.comment||'',900),questionLines=wrapLines(ctx,s.nextQuestion||'',900);const goalCount=s.lessonGoal?Math.min(goalLines.length,4):0;const commentCount=Math.min(commentLines.length,6);const questionCount=s.nextQuestion?Math.min(questionLines.length,4):0;const h=Math.max(110,88+goalCount*23+commentCount*23+questionCount*23+(s.nextQuestion?25:0));if(y+h>1685){p=newReportPage();pages.push(p);ctx=p.ctx;drawReportHeader(p,u.unitTitle,'めあて・振り返り・次時への問い（続き）');y=255}roundRect(ctx,70,y,1100,h,12,'#fff','#e2e8f0');pdfFont(ctx,17,800);ctx.fillStyle='#92400e';ctx.fillText(`第${lesson}回`,92,y+17);pdfFont(ctx,15,400);ctx.fillStyle='#64748b';ctx.fillText(s.displayDate||s.date||'',185,y+19);pdfFont(ctx,24,800);ctx.fillStyle='#4338ca';ctx.textAlign='right';ctx.fillText(`${clampScore(s.overall)}%`,1135,y+14);ctx.textAlign='left';let ty=y+50;if(s.lessonGoal){pdfFont(ctx,15,800);ctx.fillStyle='#4338ca';ctx.fillText('めあて',92,ty);pdfFont(ctx,16,400);ctx.fillStyle='#1e293b';ty=drawWrapped(ctx,s.lessonGoal,170,ty,945,23,4)+12}pdfFont(ctx,15,800);ctx.fillStyle='#334155';ctx.fillText('振り返り',92,ty);pdfFont(ctx,16,400);ctx.fillStyle='#1e293b';ty=drawWrapped(ctx,s.comment||'',190,ty,925,23,6)+12;if(s.nextQuestion){pdfFont(ctx,15,800);ctx.fillStyle='#0f766e';ctx.fillText('次時への問い',92,ty);pdfFont(ctx,16,400);ctx.fillStyle='#1e293b';drawWrapped(ctx,s.nextQuestion,210,ty,905,23,4)}y+=h+12}}
   return pages.map(p=>p.canvas);
 }
 function base64ToBytes(dataUrl){const b64=dataUrl.split(',')[1],bin=atob(b64),arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return arr}
