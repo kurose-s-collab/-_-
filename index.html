@@ -112,15 +112,17 @@ function canUseNativeFilePicker(){ return !isEmbeddedView() && window.isSecureCo
 
 function normalizeImportedData(parsed){
   if(!parsed || !Array.isArray(parsed.units) || !parsed.units.length) throw new Error('このファイルは学習データの形式ではありません。');
-  const units=parsed.units.map((unit,ui)=>{
+  const units=parsed.units.map((rawUnit,ui)=>{
+    const unit=(rawUnit&&typeof rawUnit==='object')?rawUnit:{};
     const unitId=unit.id||`unit-import-${Date.now()}-${ui}`;
-    const viewpoints=Array.isArray(unit.viewpoints)&&unit.viewpoints.length ? unit.viewpoints.map((vp,vi)=>({
-      id:vp.id||`vp-import-${ui}-${vi}`, name:vp.name||`項目${vi+1}`, score:clampScore(vp.score), note:vp.note||''
-    })) : [{id:`vp-import-${ui}-0`,name:'学習内容の理解',score:50,note:''}];
+    const viewpoints=Array.isArray(unit.viewpoints)&&unit.viewpoints.length ? unit.viewpoints.map((rawVp,vi)=>{
+      const vp=(rawVp&&typeof rawVp==='object')?rawVp:{};
+      return {id:vp.id||`vp-import-${ui}-${vi}`, name:vp.name||`項目${vi+1}`, score:clampScore(vp.score), note:vp.note||''};
+    }) : [{id:`vp-import-${ui}-0`,name:'学習内容の理解',score:50,note:''}];
     return {
       id:unitId, unitTitle:unit.unitTitle||unit.title||`単元${ui+1}`, centralQuestion:unit.centralQuestion||unit.question||'', targetGoal:unit.targetGoal||'',
       isManualOverall:!!unit.isManualOverall, manualOverallScore:clampScore(unit.manualOverallScore), viewpoints,
-      snapshots:Array.isArray(unit.snapshots)?unit.snapshots.map((s,si)=>({...s,lessonNumber:Number(s.lessonNumber)||(si+1),overall:clampScore(s.overall),comment:s.comment||'',lessonGoal:s.lessonGoal||s.goal||'',nextQuestion:s.nextQuestion||''})):[]
+      snapshots:Array.isArray(unit.snapshots)?unit.snapshots.map((rawSnap,si)=>{const snap=(rawSnap&&typeof rawSnap==='object')?rawSnap:{};return {...snap,lessonNumber:Number(snap.lessonNumber)||(si+1),overall:clampScore(snap.overall),scores:(snap.scores&&typeof snap.scores==='object')?snap.scores:{},comment:snap.comment||'',lessonGoal:snap.lessonGoal||snap.goal||'',nextQuestion:snap.nextQuestion||''}}):[]
     };
   });
   const wanted=parsed.currentUnitId;
@@ -132,10 +134,24 @@ function normalizeImportedData(parsed){
   };
 }
 
+const startupDiagnostics=[];
+const recoverableStoredEntries=[];
+function safeStorageGet(key){
+  try{return window.localStorage?localStorage.getItem(key):null}catch(e){startupDiagnostics.push(`保存領域の読み取り制限: ${key}`);console.warn('保存領域を読み取れません',key,e);return null}
+}
+function safeStorageSet(key,value){
+  try{if(!window.localStorage)return false;localStorage.setItem(key,value);return true}catch(e){startupDiagnostics.push(`保存領域への書き込み制限: ${key}`);console.warn('保存領域へ書き込めません',key,e);return false}
+}
+function safeStorageRemove(key){try{if(window.localStorage)localStorage.removeItem(key);return true}catch(e){console.warn('保存領域から削除できません',key,e);return false}}
+function collectStoredEntries(){
+  recoverableStoredEntries.length=0;
+  for(const key of [STORAGE_KEY,...LEGACY_KEYS]){const raw=safeStorageGet(key);if(raw)recoverableStoredEntries.push({key,raw});}
+}
 function loadInitialData(){
-  const keys=[STORAGE_KEY,...LEGACY_KEYS];
-  for(const key of keys){
-    try{ const raw=localStorage.getItem(key); if(raw) return normalizeImportedData(JSON.parse(raw)); }catch(e){ console.warn('保存データの読み込みに失敗',e); }
+  collectStoredEntries();
+  for(const entry of recoverableStoredEntries){
+    try{return normalizeImportedData(JSON.parse(entry.raw));}
+    catch(e){startupDiagnostics.push(`旧保存データ「${entry.key}」はそのままでは読めませんでした`);console.warn('保存データの読み込みに失敗',entry.key,e);}
   }
   return createInitialData();
 }
@@ -153,15 +169,15 @@ let filePermissionState='none';
 let statusMessage='';
 let errorMessage='';
 let statusTimer=null;
-let autoSaveEnabled=localStorage.getItem(AUTO_SAVE_PREF_KEY)!=='false';
+let autoSaveEnabled=safeStorageGet(AUTO_SAVE_PREF_KEY)!=='false';
 let modalOpen=false;
 let newUnitDraft={unitTitle:'',centralQuestion:'',targetGoal:'',firstViewpoint:'学習内容の理解'};
 
 function persistData(){
   if(!autoSaveEnabled) return;
-  try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(data)); }catch(e){ console.warn('端末内自動保存に失敗',e); }
+  safeStorageSet(STORAGE_KEY,JSON.stringify(data));
 }
-function clearLegacyLocalData(){ [STORAGE_KEY,...LEGACY_KEYS].forEach(k=>localStorage.removeItem(k)); }
+function clearLegacyLocalData(){ [STORAGE_KEY,...LEGACY_KEYS].forEach(k=>safeStorageRemove(k)); }
 function currentUnit(){ return data.units.find(u=>u.id===data.currentUnitId)||data.units[0]; }
 function updateCurrentUnit(mutator){
   const idx=data.units.findIndex(u=>u.id===data.currentUnitId);
@@ -272,7 +288,7 @@ function renderTopSummary(){
   const score=document.getElementById('topScore');if(score)score.innerHTML=`<div class="num">${overall}<span style="font-size:18px">%</span></div><div class="label">現在の全体達成度</div>${diff!==null?`<div class="diff ${diff>=0?'positive':'negative'}">前回比 ${diff>=0?'+':''}${diff}%</div>`:''}<div class="lesson-badge">現在 第${currentLessonNumber(unit)}回の授業</div>`;
 }
 
-function render(){
+function renderCore(){
   const unit=currentUnit(),overall=effectiveOverall(unit),lesson=currentLessonNumber(unit);
   document.getElementById('app').innerHTML=`
   <div class="app">
@@ -309,6 +325,46 @@ function render(){
   renderFilebar();renderMessages();renderTopSummary();renderTab();bindShellEvents();if(modalOpen)renderModal();
 }
 
+
+function recoveryBackupText(){
+  collectStoredEntries();
+  return JSON.stringify({
+    recoveryBackup:true,
+    createdAt:new Date().toISOString(),
+    note:'ブラウザ内に残っていた保存データの退避用バックアップです。元データは削除していません。',
+    entries:recoverableStoredEntries
+  },null,2);
+}
+function downloadRecoveryBackup(){
+  const text=recoveryBackupText();
+  downloadBlob(new Blob([text],{type:'application/json;charset=utf-8'}),`学びの可視化_ブラウザ保存データ退避_${dateForFile()}.json`);
+}
+function showRecoveryScreen(err){
+  console.error('画面描画中のエラー',err);
+  const root=document.getElementById('app');if(!root)return;
+  root.innerHTML=`<div class="container" style="max-width:760px;padding-top:42px">
+    <section class="card stack" style="border-color:#fde68a">
+      <div style="font-size:34px">🛟</div>
+      <h2 style="font-size:20px">アプリを安全モードで起動できます</h2>
+      <p class="small" style="line-height:1.8">この端末のブラウザに残っている古い保存情報の一部が、現在のアプリと合わない可能性があります。<strong>保存データはまだ削除していません。</strong></p>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px" class="small">まず「ブラウザ保存データを退避」を押してバックアップを作ることをおすすめします。その後、安全モードで起動して、手元の通常JSONがあれば「開く」から読み込めます。</div>
+      <div class="row wrap">
+        <button class="btn btn-amber" id="recoveryBackupBtn">💾 ブラウザ保存データを退避</button>
+        <button class="btn btn-indigo" id="safeStartBtn">安全モードで起動</button>
+        <button class="btn btn-light" id="reloadBtn">再読み込み</button>
+      </div>
+      <p class="tiny muted">安全モードはブラウザ内の古いデータを削除しません。自動保存を一時的にOFFにして初期画面を開きます。</p>
+    </section>
+  </div>`;
+  document.getElementById('recoveryBackupBtn').onclick=downloadRecoveryBackup;
+  document.getElementById('safeStartBtn').onclick=()=>{autoSaveEnabled=false;data=createInitialData();activeTab='input';todayComment='';todayGoal='';todayNextQuestion='';try{renderCore()}catch(e){root.innerHTML='<div class="container"><div class="status err">安全モードでも起動できませんでした。先生に画面を見せてください。</div></div>'}};
+  document.getElementById('reloadBtn').onclick=()=>location.reload();
+}
+function render(){
+  try{renderCore();}
+  catch(e){showRecoveryScreen(e);}
+}
+
 function bindShellEvents(){
   document.getElementById('openBtn').onclick=openData;
   document.getElementById('saveBtn').onclick=()=>saveData(false);
@@ -317,7 +373,7 @@ function bindShellEvents(){
   document.getElementById('addUnitBtn').onclick=()=>{modalOpen=true;newUnitDraft={unitTitle:'',centralQuestion:'',targetGoal:'',firstViewpoint:'学習内容の理解'};renderModal()};
   document.getElementById('unitSelect').onchange=e=>{data.currentUnitId=e.target.value;selectedViewpointId=null;todayGoal='';todayComment='';todayNextQuestion='';persistData();render()};
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{activeTab=b.dataset.tab;render()});
-  document.getElementById('autoSaveToggle').onchange=e=>{autoSaveEnabled=e.target.checked;localStorage.setItem(AUTO_SAVE_PREF_KEY,String(autoSaveEnabled));if(autoSaveEnabled){persistData();flash('この端末への自動保存をONにしました。')}else{clearLegacyLocalData();flash('この端末への自動保存をOFFにし、ブラウザ内の学習データを消去しました。JSONファイルには影響しません。')}};
+  document.getElementById('autoSaveToggle').onchange=e=>{autoSaveEnabled=e.target.checked;safeStorageSet(AUTO_SAVE_PREF_KEY,String(autoSaveEnabled));if(autoSaveEnabled){persistData();flash('この端末への自動保存をONにしました。')}else{clearLegacyLocalData();flash('この端末への自動保存をOFFにし、ブラウザ内の学習データを消去しました。JSONファイルには影響しません。')}};
   document.getElementById('clearLocalBtn').onclick=()=>{if(confirm('このブラウザ内に自動保存された学習データを消去します。現在画面に表示中のデータやJSONファイルは消えません。よろしいですか？')){clearLegacyLocalData();flash('ブラウザ内の自動保存データを消去しました。')}};
 }
 
@@ -518,16 +574,25 @@ async function exportPdf(){
   }catch(e){if(e?.name==='AbortError'){flash('PDFの保存をキャンセルしました。')}else{console.error(e);fail(`PDFを出力できませんでした：${e.message||'不明なエラー'}`)}}finally{const b=document.getElementById('pdfBtn');if(b){b.disabled=false;b.textContent='📄 PDF出力'}}
 }
 
+
+window.addEventListener('error',e=>{const root=document.getElementById('app');if(root&&!root.innerHTML.trim())showRecoveryScreen(e.error||new Error(e.message||'起動エラー'));});
+window.addEventListener('unhandledrejection',e=>{const root=document.getElementById('app');if(root&&!root.innerHTML.trim())showRecoveryScreen(e.reason||new Error('起動処理エラー'));});
+
 // ファイル選択フォールバック
 document.getElementById('fallbackFileInput').addEventListener('change',async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{await loadFile(f,null)}catch(err){fail(`ファイルを読み込めませんでした：${err.message||'形式を確認してください'}`)}});
 
 window.addEventListener('resize',()=>{if(activeTab==='visual')renderVisual(document.getElementById('tabContent'))});
 
+function withTimeout(promise,ms){return Promise.race([promise,new Promise(resolve=>setTimeout(()=>resolve(null),ms))]);}
 (async function init(){
-  if(canUseNativeFilePicker()){
-    const h=await restoreRememberedFileHandle();if(h){fileHandle=h;fileName=h.name||'';try{filePermissionState=h.queryPermission?await h.queryPermission({mode:'readwrite'}):'prompt'}catch{filePermissionState='prompt'}}
-  }
+  // 先に画面を描画する。保存先ハンドルの復元が遅延・故障しても白画面にしない。
   render();
+  if(canUseNativeFilePicker()){
+    try{
+      const h=await withTimeout(restoreRememberedFileHandle(),1200);
+      if(h){fileHandle=h;fileName=h.name||'';try{filePermissionState=h.queryPermission?await h.queryPermission({mode:'readwrite'}):'prompt'}catch{filePermissionState='prompt'};renderFilebar();}
+    }catch(e){console.warn('保存先情報の復元をスキップしました',e);}
+  }
 })();
 </script>
 </body>
